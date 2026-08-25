@@ -15,7 +15,9 @@
 > # 登录算力主机（通过网线直连时需配置本机41网段网卡 MTU 为 9000）
 > ssh nvidia@192.168.41.2
 > 
-> # 加载 ROS2 工作空间
+> # 加载 ROS2 工作空间环境（顺序不能颠倒，缺一不可）
+> source /opt/ros/jazzy/setup.bash
+> source /opt/humanoid/install/setup.bash
 > source ~/xos/setup.bash
 > ```
 
@@ -58,10 +60,12 @@ git clone https://github.com/Open-X-Humanoid/xhumanoid_sdk.git
 
 ### 编译
 
-所有示例依赖 xos 工作空间中的 ROS 2 消息包（`ros2_bridge_msgs`、`interaction_msgs` 等），需要先加载 xos 环境再编译：
+所有示例依赖 xos 工作空间中的 ROS 2 消息包（`ros2_bridge_msgs`、`interaction_msgs` 等），需要先按以下顺序加载环境再编译（`ros2_bridge_msgs` 由 `/opt/humanoid/install` 提供，`~/xos` 里只有新版 `lyre_msgs`，缺一不可）。机器人算力主机已在 `~/.bashrc` 中配置为登录后自动按此顺序加载，新开终端无需手动 source：
 
 ```bash
-# 加载 xos 工作空间环境
+# 按顺序加载环境：ROS 2 -> 人形机器人 SDK（ros2_bridge_msgs）-> xos 工作空间（新版 lyre_msgs）
+source /opt/ros/jazzy/setup.bash
+source /opt/humanoid/install/setup.bash
 source ~/xos/setup.bash
 
 # 编译单个示例（推荐）
@@ -74,8 +78,11 @@ colcon build --packages-select single_joint_control_py single_joint_control_cpp
 ### 运行示例
 
 ```bash
-# 确保已加载 xos 环境
+# 按顺序加载环境，并额外加载本仓库的编译产物（运行时需要；新终端已由 ~/.bashrc 自动加载）
+source /opt/ros/jazzy/setup.bash
+source /opt/humanoid/install/setup.bash
 source ~/xos/setup.bash
+source ~/xos/src/xhumanoid_sdk/install/setup.bash
 
 # 示例：启动单关节控制（Python 版）
 ros2 launch single_joint_control_py single_joint_control.launch.py
