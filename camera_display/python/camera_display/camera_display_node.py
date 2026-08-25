@@ -70,7 +70,7 @@ class CameraDisplayNode(Node):
         self.enable_waist = self.get_parameter('enable_waist').get_parameter_value().bool_value
 
         qos = QoSProfile(
-            reliability=ReliabilityPolicy.RELIABLE,
+            reliability=ReliabilityPolicy.BEST_EFFORT,
             history=HistoryPolicy.KEEP_LAST,
             depth=10
         )

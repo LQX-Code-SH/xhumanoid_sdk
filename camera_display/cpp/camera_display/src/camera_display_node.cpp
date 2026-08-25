@@ -56,7 +56,7 @@ class CameraDisplayNode : public rclcpp::Node {
     bool enable_waist = this->get_parameter("enable_waist").as_bool();
 
     rclcpp::QoS qos(rclcpp::KeepLast(10));
-    qos.reliable();
+    qos.best_effort();
     qos.durability_volatile();
 
     if (enable_head) {
