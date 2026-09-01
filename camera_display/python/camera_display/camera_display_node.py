@@ -3,8 +3,8 @@
 """
 Camera Display Node (Python version)
 
-Simultaneously displays RGB and depth images from both head and waist cameras.
-Supports depth colormap, histogram, and statistics overlay.
+Simultaneously displays RGB and depth images from the head, waist and wrist
+cameras. Supports depth colormap, histogram, and statistics overlay.
 """
 
 import threading
@@ -31,6 +31,20 @@ class CameraData:
     max_depth_value: int = 0
     mean_depth_value: float = 0.0
     valid_pixel_count: int = 0
+    # Display depth range in mm (colormap normalization / histogram range).
+    min_depth: float = 0.0
+    max_depth: float = 5000.0
+    # Frame counters, bumped by the callbacks; the display loop re-renders
+    # only when they (or the display settings) change.
+    depth_seq: int = 0
+    color_seq: int = 0
+    # Display-thread caches: seq/settings the cached frames were built from.
+    depth_displayed_seq: int = -1
+    color_displayed_seq: int = -1
+    depth_settings_seq: int = -1
+    depth_display: Optional[np.ndarray] = None
+    hist_image: Optional[np.ndarray] = None
+    color_display: Optional[np.ndarray] = None
     lock: threading.Lock = field(default_factory=threading.Lock)
 
 
@@ -46,6 +60,8 @@ class CameraDisplayNode(Node):
 
     HEAD_NS = 'ob_camera_head'
     WAIST_NS = 'ob_camera_waist'
+    WRIST_LEFT_NS = 'ob_camera_wrist_left'
+    WRIST_RIGHT_NS = 'ob_camera_wrist_right'
 
     def __init__(self):
         super().__init__('camera_display_node')
@@ -59,6 +75,13 @@ class CameraDisplayNode(Node):
         self.declare_parameter('show_statistics', True)
         self.declare_parameter('enable_head', True)
         self.declare_parameter('enable_waist', True)
+        # Wrist D405 cameras (optional hardware, published by camera_wrist_driver)
+        self.declare_parameter('enable_wrist_left', False)
+        self.declare_parameter('enable_wrist_right', False)
+        # Wrist D405 is a near-range camera (~0.1-0.5 m): needs its own
+        # depth display range, otherwise the depth view stays nearly black.
+        self.declare_parameter('wrist_min_depth', 100.0)
+        self.declare_parameter('wrist_max_depth', 600.0)
 
         self.colormap = self.get_parameter('colormap').get_parameter_value().integer_value
         self.max_depth = self.get_parameter('max_depth').get_parameter_value().double_value
@@ -68,6 +91,23 @@ class CameraDisplayNode(Node):
         self.show_statistics = self.get_parameter('show_statistics').get_parameter_value().bool_value
         self.enable_head = self.get_parameter('enable_head').get_parameter_value().bool_value
         self.enable_waist = self.get_parameter('enable_waist').get_parameter_value().bool_value
+        enable_wrist_left = self.get_parameter('enable_wrist_left').get_parameter_value().bool_value
+        enable_wrist_right = self.get_parameter('enable_wrist_right').get_parameter_value().bool_value
+        wrist_min_depth = self.get_parameter('wrist_min_depth').get_parameter_value().double_value
+        wrist_max_depth = self.get_parameter('wrist_max_depth').get_parameter_value().double_value
+
+        # Guard against degenerate ranges: min >= max divides by zero in
+        # _apply_colormap and leaves the depth window permanently blank.
+        if self.min_depth >= self.max_depth:
+            self.get_logger().error(
+                f'Invalid depth range: min_depth ({self.min_depth}) must be < '
+                f'max_depth ({self.max_depth}); using 0 - 5000 mm')
+            self.min_depth, self.max_depth = 0.0, 5000.0
+        if wrist_min_depth < 0 or wrist_min_depth >= wrist_max_depth:
+            self.get_logger().error(
+                f'Invalid wrist depth range: wrist_min_depth ({wrist_min_depth}) '
+                f'must be in [0, wrist_max_depth); using 100 - 600 mm')
+            wrist_min_depth, wrist_max_depth = 100.0, 600.0
 
         qos = QoSProfile(
             reliability=ReliabilityPolicy.BEST_EFFORT,
@@ -81,12 +121,25 @@ class CameraDisplayNode(Node):
             self._setup_camera(self.HEAD_NS, 'Head', qos)
         if self.enable_waist:
             self._setup_camera(self.WAIST_NS, 'Waist', qos)
+        if enable_wrist_left:
+            self._setup_camera(
+                self.WRIST_LEFT_NS, 'Wrist Left', qos,
+                min_depth=wrist_min_depth, max_depth=wrist_max_depth)
+        if enable_wrist_right:
+            self._setup_camera(
+                self.WRIST_RIGHT_NS, 'Wrist Right', qos,
+                min_depth=wrist_min_depth, max_depth=wrist_max_depth)
 
         if not self.cameras:
-            self.get_logger().error('No camera enabled! Set enable_head or enable_waist to true.')
+            self.get_logger().error(
+                'No camera enabled! Set enable_head, enable_waist, '
+                'enable_wrist_left or enable_wrist_right to true.')
             return
 
         self.display_running = True
+        # Bumped whenever a display setting changes ('c'/'h'/'s' keys), so
+        # the display loop knows to re-render from the cached frames.
+        self._settings_seq = 0
         self.display_thread = threading.Thread(target=self.display_loop, daemon=True)
         self.display_thread.start()
 
@@ -98,8 +151,13 @@ class CameraDisplayNode(Node):
         self.get_logger().info(f'  Colormap: {self.colormap}')
         self.get_logger().info(f'  Depth range: {self.min_depth:.0f} - {self.max_depth:.0f} mm')
 
-    def _setup_camera(self, namespace, label, qos):
-        cam = CameraData(label=label)
+    def _setup_camera(self, namespace, label, qos,
+                      min_depth=None, max_depth=None):
+        cam = CameraData(
+            label=label,
+            min_depth=self.min_depth if min_depth is None else min_depth,
+            max_depth=self.max_depth if max_depth is None else max_depth,
+        )
         self.cameras[namespace] = cam
 
         self.create_subscription(
@@ -125,7 +183,8 @@ class CameraDisplayNode(Node):
             with cam.lock:
                 cam.depth_image = depth.copy()
                 self._update_depth_statistics(depth, cam)
-                cam.colored_depth = self._apply_colormap(depth)
+                cam.colored_depth = self._apply_colormap(depth, cam)
+                cam.depth_seq += 1
 
         except Exception as e:
             self.get_logger().error(f'Error processing depth image ({cam.label}): {e}')
@@ -149,6 +208,7 @@ class CameraDisplayNode(Node):
 
             with cam.lock:
                 cam.color_image = color.copy()
+                cam.color_seq += 1
 
         except Exception as e:
             self.get_logger().error(f'Error processing color image ({cam.label}): {e}')
@@ -167,9 +227,9 @@ class CameraDisplayNode(Node):
         cam.mean_depth_value = float(np.mean(depth[mask]))
         cam.valid_pixel_count = int(np.sum(mask))
 
-    def _apply_colormap(self, depth):
+    def _apply_colormap(self, depth, cam: CameraData):
         normalized = np.clip(
-            (depth - self.min_depth) * 255 / (self.max_depth - self.min_depth),
+            (depth - cam.min_depth) * 255 / (cam.max_depth - cam.min_depth),
             0, 255
         ).astype(np.uint8)
 
@@ -182,13 +242,16 @@ class CameraDisplayNode(Node):
         colored[depth == 0] = [0, 0, 0]
         return colored
 
-    def _create_histogram(self, depth):
+    def _create_histogram(self, depth, cam: CameraData):
         mask = depth > 0
         if not np.any(mask):
             return None
 
+        # calcHist range is [min, max): extend by 1 so pixels saturated at
+        # max_depth (rendered at the top colormap color) still show up in
+        # the last bin instead of being silently dropped.
         hist = cv2.calcHist([depth], [0], mask.astype(np.uint8), [256],
-                            [self.min_depth, self.max_depth])
+                            [cam.min_depth, cam.max_depth + 1])
         cv2.normalize(hist, hist, 0, 1, cv2.NORM_MINMAX)
 
         hist_h, hist_w = 200, 512
@@ -203,7 +266,7 @@ class CameraDisplayNode(Node):
                 (255, 255, 255), 2
             )
 
-        label = f'Range: {int(self.min_depth)}-{int(self.max_depth)} mm'
+        label = f'Range: {int(cam.min_depth)}-{int(cam.max_depth)} mm'
         cv2.putText(hist_image, label, (10, 20),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
         return hist_image
@@ -217,32 +280,48 @@ class CameraDisplayNode(Node):
         while self.display_running and rclpy.ok():
             for cam in self.cameras.values():
                 with cam.lock:
-                    if cam.colored_depth is not None:
-                        depth_display = cam.colored_depth.copy()
+                    # Re-render only on a new frame or a settings change;
+                    # cameras run at <= 30 Hz while this loop ticks at 30 Hz.
+                    if (cam.depth_seq != cam.depth_displayed_seq
+                            or self._settings_seq != cam.depth_settings_seq):
+                        cam.depth_displayed_seq = cam.depth_seq
+                        cam.depth_settings_seq = self._settings_seq
 
-                        if self.show_statistics:
-                            cv2.putText(depth_display, f'Min: {cam.min_depth_value} mm',
-                                        (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-                            cv2.putText(depth_display, f'Max: {cam.max_depth_value} mm',
-                                        (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-                            cv2.putText(depth_display, f'Mean: {int(cam.mean_depth_value)} mm',
-                                        (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-                            cv2.putText(depth_display, f'Valid: {cam.valid_pixel_count}',
-                                        (10, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+                        if cam.colored_depth is not None:
+                            depth_display = cam.colored_depth.copy()
 
-                        resized = cv2.resize(depth_display, None,
-                                             fx=self.display_scale, fy=self.display_scale)
-                        cv2.imshow(f'{cam.label} - Depth', resized)
+                            if self.show_statistics:
+                                cv2.putText(depth_display, f'Min: {cam.min_depth_value} mm',
+                                            (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+                                cv2.putText(depth_display, f'Max: {cam.max_depth_value} mm',
+                                            (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+                                cv2.putText(depth_display, f'Mean: {int(cam.mean_depth_value)} mm',
+                                            (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+                                cv2.putText(depth_display, f'Valid: {cam.valid_pixel_count}',
+                                            (10, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
 
-                    if self.show_histogram and cam.depth_image is not None:
-                        hist = self._create_histogram(cam.depth_image)
-                        if hist is not None:
-                            cv2.imshow(f'{cam.label} - Depth Histogram', hist)
+                            cam.depth_display = cv2.resize(depth_display, None,
+                                                           fx=self.display_scale, fy=self.display_scale)
 
-                    if cam.color_image is not None:
-                        resized = cv2.resize(cam.color_image, None,
-                                             fx=self.display_scale, fy=self.display_scale)
-                        cv2.imshow(f'{cam.label} - Color', resized)
+                        if self.show_histogram and cam.depth_image is not None:
+                            cam.hist_image = self._create_histogram(cam.depth_image, cam)
+                        else:
+                            cam.hist_image = None
+
+                    if cam.depth_display is not None:
+                        cv2.imshow(f'{cam.label} - Depth', cam.depth_display)
+
+                    if self.show_histogram and cam.hist_image is not None:
+                        cv2.imshow(f'{cam.label} - Depth Histogram', cam.hist_image)
+
+                    if cam.color_seq != cam.color_displayed_seq:
+                        cam.color_displayed_seq = cam.color_seq
+                        if cam.color_image is not None:
+                            cam.color_display = cv2.resize(cam.color_image, None,
+                                                           fx=self.display_scale, fy=self.display_scale)
+
+                    if cam.color_display is not None:
+                        cv2.imshow(f'{cam.label} - Color', cam.color_display)
 
             key = cv2.waitKey(33)
             if key == 27 or key == ord('q'):
@@ -250,12 +329,15 @@ class CameraDisplayNode(Node):
                 break
             elif key == ord('c'):
                 self.colormap = (self.colormap + 1) % 4
+                self._settings_seq += 1
                 self.get_logger().info(f'Colormap changed to: {self.colormap}')
             elif key == ord('h'):
                 self.show_histogram = not self.show_histogram
+                self._settings_seq += 1
                 self.get_logger().info(f'Histogram display: {"ON" if self.show_histogram else "OFF"}')
             elif key == ord('s'):
                 self.show_statistics = not self.show_statistics
+                self._settings_seq += 1
                 self.get_logger().info(f'Statistics display: {"ON" if self.show_statistics else "OFF"}')
 
     def destroy_node(self):

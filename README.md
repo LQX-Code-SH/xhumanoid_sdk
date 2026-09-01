@@ -53,14 +53,14 @@
 # 登录具身天工 3.0 开发板
 ssh nvidia@192.168.41.2
 
-# 克隆仓库到机器人工作空间的 src 目录下
-cd ~/xos/src
+# 克隆仓库到机器人 ~/work 目录下
+cd ~/work
 git clone https://github.com/Open-X-Humanoid/xhumanoid_sdk.git
 ```
 
 ### 编译
 
-所有示例依赖 xos 工作空间中的 ROS 2 消息包（`ros2_bridge_msgs`、`interaction_msgs` 等），需要先按以下顺序加载环境再编译（`ros2_bridge_msgs` 由 `/opt/humanoid/install` 提供，`~/xos` 里只有新版 `lyre_msgs`，缺一不可）。机器人算力主机已在 `~/.bashrc` 中配置为登录后自动按此顺序加载，新开终端无需手动 source：
+所有示例依赖 xos 工作空间中的 ROS 2 消息包（`ros2_bridge_msgs`、`interaction_msgs` 等），需要先按以下顺序加载环境再编译（`ros2_bridge_msgs` 由 `/opt/humanoid/install` 提供，`~/xos` 里只有新版 `lyre_msgs`，缺一不可；`~/xos` 必须最后加载，否则旧版同名包会压住新版）。机器人算力主机已在 `~/.bashrc` 中配置为登录后自动按此顺序加载，新开终端无需手动 source：
 
 ```bash
 # 按顺序加载环境：ROS 2 -> 人形机器人 SDK（ros2_bridge_msgs）-> xos 工作空间（新版 lyre_msgs）
@@ -73,16 +73,33 @@ colcon build --packages-select single_joint_control_py
 
 # 或编译某个示例的 Python + C++ 版本
 colcon build --packages-select single_joint_control_py single_joint_control_cpp
+
+# 全量编译（补齐全部示例的 Python + C++ 版本）
+colcon build
 ```
+
+### 编译常见问题
+
+- **编译报 `fatal error: xxx.hpp: No such file or directory`**：多为 build 缓存残留了旧依赖路径（如 `lyre_msgs_DIR` 被钉死在旧版 `/opt/humanoid/install/lyre_msgs`，而源码用到的是 `~/xos` 新版消息）。删除该包缓存后重新编译：
+
+  ```bash
+  rm -rf build/<包名> install/<包名>
+  colcon build --packages-select <包名>
+  ```
+
+- **`source install/setup.bash` 报 `not found: .../install/<包名>/share/<包名>/local_setup.bash`**：该包上次构建被中断，install 目录残留不完整产物（缺 `local_setup.bash` 与可执行文件）。同样删除 `install/<包名>` 后重新编译即可，setup.bash 会随之重新生成。
+
+- 编译过程中如遇其他依赖缺失，请确认环境按上述三层顺序加载（顺序影响同名包如 `lyre_msgs` 的解析优先级）。
 
 ### 运行示例
 
 ```bash
-# 按顺序加载环境，并额外加载本仓库的编译产物（运行时需要；新终端已由 ~/.bashrc 自动加载）
+# 在仓库根目录下按顺序加载环境，并额外加载本仓库的编译产物
+# （运行时需要；新终端已由 ~/.bashrc 自动加载，无需手动执行）
 source /opt/ros/jazzy/setup.bash
 source /opt/humanoid/install/setup.bash
 source ~/xos/setup.bash
-source ~/xos/src/xhumanoid_sdk/install/setup.bash
+source install/setup.bash
 
 # 示例：启动单关节控制（Python 版）
 ros2 launch single_joint_control_py single_joint_control.launch.py
@@ -90,6 +107,9 @@ ros2 launch single_joint_control_py single_joint_control.launch.py
 # 示例：启动单关节控制（C++ 版）
 ros2 launch single_joint_control_cpp single_joint_control.launch.py
 ```
+
+> `~/.bashrc` 已自动加载上面四层环境（`/opt/ros/jazzy` → `/opt/humanoid/install` → `~/xos` → 本仓库 `install`，末层带存在性检查），
+> 新开终端可直接 `ros2 launch ...` 无需手动 source。只有修改了 `~/.bashrc` 未生效时才需要手动执行上面的命令。
 
 ## 示例列表
 
@@ -106,6 +126,7 @@ ros2 launch single_joint_control_cpp single_joint_control.launch.py
 | [speaker_play_demo](speaker_play_demo/) | 喇叭音频播放 | 标配 |
 | [mic_record_demo](mic_record_demo/) | 麦克风录音 | 标配 |
 | [camera_display](camera_display/) | 头部 & 腰部相机 RGB/深度显示 | 标配 |
+| [camera_wrist_driver](camera_wrist_driver/) | 腕部 RealSense D405 相机 RGB/深度驱动 | 选配 |
 | [brainco_hand_touch_display](brainco_hand_touch_display/) | 强脑手触觉反馈显示 | 选配 |
 
 > **选配** 示例需要额外硬件支持，部分机型可能未配备。
@@ -133,6 +154,7 @@ xhumanoid_sdk/
 ├── speaker_play_demo/                  # 喇叭播放示例
 ├── mic_record_demo/                    # 麦克风录音示例
 ├── camera_display/                     # 头部 & 腰部相机示例
+├── camera_wrist_driver/                # 腕部 D405 相机驱动示例（选配）
 └── brainco_hand_touch_display/         # 触觉反馈示例（选配）
 ```
 

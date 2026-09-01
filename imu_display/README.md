@@ -223,7 +223,7 @@ imu_display/
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # 创建虚拟环境
-cd ~/xos/src/example/sdk_demo/imu_display/python
+cd ~/work/xhumanoid_sdk/imu_display/python
 uv venv
 uv pip install matplotlib "numpy>=1.21.0,<2.0.0" pyyaml
 

@@ -1,0 +1,20 @@
+[Unit]
+Description=RealSense D405 Wrist Camera (right) ROS2 Publisher
+# Align with orbbec_head/orbbec_waist: start after multi-user is up
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=nvidia
+EnvironmentFile=/etc/realsense-wrist/wrist_right.env
+ExecStart={REPO_DIR}/scripts/start_wrist.sh right
+Restart=on-failure
+RestartSec=3
+KillSignal=SIGTERM
+TimeoutStopSec=15
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

@@ -37,6 +37,22 @@ def generate_launch_description():
         'enable_waist', default_value='true',
         description='Enable waist camera display'
     )
+    enable_wrist_left_arg = DeclareLaunchArgument(
+        'enable_wrist_left', default_value='false',
+        description='Enable left wrist D405 camera display (requires camera_wrist_driver)'
+    )
+    enable_wrist_right_arg = DeclareLaunchArgument(
+        'enable_wrist_right', default_value='false',
+        description='Enable right wrist D405 camera display (requires camera_wrist_driver)'
+    )
+    wrist_min_depth_arg = DeclareLaunchArgument(
+        'wrist_min_depth', default_value='100.0',
+        description='Wrist D405 minimum depth value in mm for visualization'
+    )
+    wrist_max_depth_arg = DeclareLaunchArgument(
+        'wrist_max_depth', default_value='600.0',
+        description='Wrist D405 maximum depth value in mm for visualization'
+    )
 
     camera_display_node = Node(
         package='camera_display_py',
@@ -52,6 +68,10 @@ def generate_launch_description():
             'show_statistics': LaunchConfiguration('show_statistics'),
             'enable_head': LaunchConfiguration('enable_head'),
             'enable_waist': LaunchConfiguration('enable_waist'),
+            'enable_wrist_left': LaunchConfiguration('enable_wrist_left'),
+            'enable_wrist_right': LaunchConfiguration('enable_wrist_right'),
+            'wrist_min_depth': LaunchConfiguration('wrist_min_depth'),
+            'wrist_max_depth': LaunchConfiguration('wrist_max_depth'),
         }]
     )
 
@@ -64,5 +84,9 @@ def generate_launch_description():
         show_statistics_arg,
         enable_head_arg,
         enable_waist_arg,
+        enable_wrist_left_arg,
+        enable_wrist_right_arg,
+        wrist_min_depth_arg,
+        wrist_max_depth_arg,
         camera_display_node,
     ])
