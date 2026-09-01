@@ -1,0 +1,4 @@
+# 本目录为第三方参考仓库（git 子模块），其中的示例包（ament_python / ament_cmake）
+# 不参与本项目 colcon 构建，故由 COLCON_IGNORE 排除。
+# 说明：本文件位于子模块工作树内，不会被子模块仓库跟踪；
+# 全新 clone 后需执行: touch src/xhumanoid_sdk/COLCON_IGNORE

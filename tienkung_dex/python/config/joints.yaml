@@ -1,0 +1,17 @@
+# 关节 ID 映射表（设计文档 09 附录 A）
+#
+# 本文件为**占位示例**：完整四组（arm/head/waist/leg）映射必须在真机上
+# 按附录 A 方法导出核对后填写：
+#   1) ros2 topic echo /robot_state 导出各 status[] 的 name（关节 ID）与 pos
+#   2) 手动微动单关节，比对 ID <-> 关节名 <-> 运动方向
+#   3) 与参考资料 SDK 文档 v26.06.x 的关节 id 表交叉核对，全量一致才可入库
+#
+# 已知样例（demo 佐证）：21 = 右肩 Pitch（single_joint_control）
+# 未填写完整前，默认 strict=false：未知 ID 仅告警不拦截；
+# strict=true 时（create_robot(strict_joint_ids=True)）未知 ID 直接拒绝。
+#
+arm:
+  - {id: 21, name: right_shoulder_pitch, limits: [-1.588, 0.0]}   # demo 佐证
+# head:  []
+# waist: []
+# leg:   []

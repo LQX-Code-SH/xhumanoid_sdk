@@ -1,0 +1,40 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>tienkung_dex</name>
+  <version>0.1.0</version>
+  <description>
+    TienkungDex robot facade library: a unified, backend-switchable Python
+    interface over the TienKung DEX SDK capabilities (joint control, cameras,
+    IMU/lidar/GPS, TTS/ASR/audio, dexterous hand, e-stop). Real (SDK topics)
+    and sim/mock backends share one API.
+  </description>
+  <maintainer email="noreply@example.com">Open-X-Humanoid</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_python</buildtool_depend>
+
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>builtin_interfaces</exec_depend>
+  <exec_depend>ament_index_python</exec_depend>
+  <exec_depend>python3-numpy</exec_depend>
+
+  <!--
+    Real backend additionally requires (runtime only, provided by the robot
+    host, NOT listed here so this package stays buildable off-robot):
+      ros2_bridge_msgs  (/opt/humanoid/install)
+      lyre_msgs         (~/xos)
+      interaction_msgs
+      brainco_hand_msgs
+      navigation_msgs
+  -->
+
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>
