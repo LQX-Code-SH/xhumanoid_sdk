@@ -1,0 +1,7 @@
+# 因时灵巧手手势控制节点配置文件
+
+# 手的前缀: right_hand 或 left_hand
+hand_prefix: "right_hand"
+
+# 手编号: 1=左手, 2=右手 (vendor demo 07 约定)
+hand_id: 2

@@ -64,6 +64,7 @@ class RobotStateCache:
         self._node = node
         self._topic = topic
         self._log = logger
+        self._qos_depth = qos_depth
         self._sub = None
         self._groups: dict[str, dict[int, JointReading]] = {}
         self._last_stamp = None
@@ -80,7 +81,8 @@ class RobotStateCache:
             return False
         try:
             self._sub = self._node.create_subscription(
-                msg_cls, self._topic, self._on_robot_state, qos_depth)
+                msg_cls, self._topic, self._on_robot_state,
+                self._qos_depth)
         except Exception as exc:
             if self._log is not None:
                 self._log.error(f'RobotStateCache: subscribe failed: {exc}')

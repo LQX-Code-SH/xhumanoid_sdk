@@ -8,8 +8,9 @@ import numpy as np
 import pytest
 
 from tienkung_dex import (BackendUnavailableError, CameraFrame, ControlMode,
-                          EstopActiveError, JointCommand, TienkungDex,
-                          UnsafeModeError, create_robot)
+                          EstopActiveError, JointCommand, PowerReading,
+                          SbusReading, TienkungDex, UnsafeModeError,
+                          create_robot)
 
 
 @pytest.fixture()
@@ -31,6 +32,8 @@ def test_facade_assembles_all_subsystems(robot):
     assert robot.audio is not None and robot.safety is not None
     assert robot.imu is not None and robot.lidar is not None
     assert robot.gps is not None and robot.force is not None
+    assert robot.power is not None and robot.light is not None
+    assert robot.sbus is not None and robot.serial is not None
     assert robot.panorama is None  # excluded by default (optional hardware)
 
 
@@ -160,5 +163,40 @@ def test_enable_subset(robot):
         assert instance.arm is not None
         assert instance.cameras == {}          # camera excluded
         assert instance.audio is None
+        assert instance.power is None
+        assert instance.light is None
     finally:
         instance.shutdown()
+
+
+def test_power_injection_and_observer(robot):
+    readings = []
+    robot.power.on_update(readings.append)
+    robot.power.inject(PowerReading(voltage=48.1, current=2.5,
+                                    power_w=120.0))
+    latest = robot.power.latest()
+    assert latest.voltage == 48.1
+    assert latest.power_w == 120.0
+    assert readings == [latest]
+
+
+def test_light_set_mode_and_command_history(robot):
+    assert robot.light.set_mode('wakeup')
+    assert robot.light.commands == [(301, ())]
+    assert not robot.light.set_mode('disco')
+    robot.light.set_cmd(7, (1, 2))
+    assert robot.light.commands[-1] == (7, (1, 2))
+
+
+def test_sbus_injection(robot):
+    robot.sbus.inject(SbusReading(axes=(0.5, -0.2, 0.0, 0.0),
+                                  buttons=(1, 0, 0, 0, 0, 0)))
+    latest = robot.sbus.latest()
+    assert latest.axes[0] == 0.5
+    assert latest.buttons[0] == 1
+
+
+def test_serial_number(robot):
+    assert robot.serial.get_serial_number() == 'MOCK-SN-0000'
+    robot.serial.set_serial('SN-1234')
+    assert robot.serial.get_serial_number() == 'SN-1234'

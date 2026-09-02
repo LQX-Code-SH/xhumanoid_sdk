@@ -8,3 +8,8 @@ __pycache__/
 
 # pytest
 .pytest_cache/
+tienkung_dex/log/*
+.gitignore
+tienkung_dex/python/build/*
+tienkung_dex/python/install/*
+tienkung_dex/python/log/*

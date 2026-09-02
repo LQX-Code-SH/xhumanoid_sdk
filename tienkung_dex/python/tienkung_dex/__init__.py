@@ -33,6 +33,8 @@ from .core.types import (
     ImuReading,
     JointCommand,
     JointReading,
+    PowerReading,
+    SbusReading,
     TouchReading,
     WrenchReading,
 )
@@ -53,6 +55,8 @@ __all__ = [
     'AudioChunk',
     'GpsFixReading',
     'WrenchReading',
+    'PowerReading',
+    'SbusReading',
     'RobotError',
     'BackendUnavailableError',
     'EstopActiveError',

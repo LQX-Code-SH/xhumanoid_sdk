@@ -1,17 +1,51 @@
 # 关节 ID 映射表（设计文档 09 附录 A）
 #
-# 本文件为**占位示例**：完整四组（arm/head/waist/leg）映射必须在真机上
-# 按附录 A 方法导出核对后填写：
-#   1) ros2 topic echo /robot_state 导出各 status[] 的 name（关节 ID）与 pos
-#   2) 手动微动单关节，比对 ID <-> 关节名 <-> 运动方向
-#   3) 与参考资料 SDK 文档 v26.06.x 的关节 id 表交叉核对，全量一致才可入库
+# 本表已按 SDK 参考表（v26.06.x，2026-09-01 由项目方提供）全量填写，
+# 并与真机 /robot_state 实测 ID 集合核对一致（arm 11~17/21~27、head 1/2、
+# waist 31~33、leg 51~56/61~66，共 31 个）。
 #
-# 已知样例（demo 佐证）：21 = 右肩 Pitch（single_joint_control）
-# 未填写完整前，默认 strict=false：未知 ID 仅告警不拦截；
-# strict=true 时（create_robot(strict_joint_ids=True)）未知 ID 直接拒绝。
+# 仍待验证（附录 A 步骤 2）：手动微动单关节，核对 ID <-> 关节名 <->
+# 运动方向与运动范围，全部一致后才建议开启 strict 模式。
+#
+# 注：旧占位表曾写 21 限位 [-1.588, 0.0]（single_joint_control demo 的
+# 目标值），与全量表（±163°）不冲突——demo 目标在限位之内，已按全量表修正。
+#
+# limits 单位：rad（弧度）。名称按 snake_case 命名。
 #
 arm:
-  - {id: 21, name: right_shoulder_pitch, limits: [-1.588, 0.0]}   # demo 佐证
-# head:  []
-# waist: []
-# leg:   []
+  - {id: 11, name: left_shoulder_pitch, limits: [-2.8449, 2.8449]}
+  - {id: 12, name: left_shoulder_roll,  limits: [-0.1920, 3.3336]}
+  - {id: 13, name: left_shoulder_yaw,   limits: [-2.8449, 2.8449]}
+  - {id: 14, name: left_elbow_pitch,    limits: [-2.5482, 0.1920]}
+  - {id: 15, name: left_wrist_yaw,      limits: [-2.8449, 2.8449]}
+  - {id: 16, name: left_wrist_pitch,    limits: [-1.3265, 1.3265]}
+  - {id: 17, name: left_wrist_roll,     limits: [-1.3265, 1.3265]}
+  - {id: 21, name: right_shoulder_pitch, limits: [-2.8449, 2.8449]}
+  - {id: 22, name: right_shoulder_roll,  limits: [-3.3336, 0.1920]}
+  - {id: 23, name: right_shoulder_yaw,   limits: [-2.8449, 2.8449]}
+  - {id: 24, name: right_elbow_pitch,    limits: [-2.5482, 0.1920]}
+  - {id: 25, name: right_wrist_yaw,      limits: [-2.8449, 2.8449]}
+  - {id: 26, name: right_wrist_pitch,    limits: [-1.3265, 1.3265]}
+  - {id: 27, name: right_wrist_roll,     limits: [-1.3265, 1.3265]}
+head:
+  - {id: 1, name: head_yaw,   limits: [-1.0472, 1.0472]}
+  # 注：vendor demo 03_head_control 写电机 2 上限 50°（0.8727 rad），
+  # 本表按 SDK 参考表取 58°（1.0123 rad），差异待真机微动核对（README 已知限制 10）。
+  - {id: 2, name: head_pitch, limits: [-0.2618, 1.0123]}
+waist:
+  - {id: 31, name: waist_pitch, limits: [-0.5236, 0.8727]}
+  - {id: 32, name: waist_roll,  limits: [-0.4363, 0.4363]}
+  - {id: 33, name: waist_yaw,   limits: [-2.6180, 3.2289]}
+leg:
+  - {id: 51, name: left_hip_pitch,    limits: [-3.0543, 2.7925]}
+  - {id: 52, name: left_hip_roll,     limits: [-0.4189, 2.6180]}
+  - {id: 53, name: left_hip_yaw,      limits: [-1.3963, 4.4506]}
+  - {id: 54, name: left_knee_pitch,   limits: [-0.0873, 2.5307]}
+  - {id: 55, name: left_ankle_pitch,  limits: [-1.1868, 0.5236]}
+  - {id: 56, name: left_ankle_roll,   limits: [-0.5236, 0.5236]}
+  - {id: 61, name: right_hip_pitch,   limits: [-3.0543, 2.7925]}
+  - {id: 62, name: right_hip_roll,    limits: [-0.4189, 2.6180]}
+  - {id: 63, name: right_hip_yaw,     limits: [-1.3963, 4.4506]}
+  - {id: 64, name: right_knee_pitch,  limits: [-0.0873, 2.5307]}
+  - {id: 65, name: right_ankle_pitch, limits: [-1.1868, 0.5236]}
+  - {id: 66, name: right_ankle_roll,  limits: [-0.5236, 0.5236]}

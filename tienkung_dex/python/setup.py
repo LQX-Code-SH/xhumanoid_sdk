@@ -23,7 +23,8 @@ def package_files(directory: str):
 setup(
     name=package_name,
     version='0.1.0',
-    packages=find_packages(exclude=['tests', 'tests.*']),
+    packages=find_packages(exclude=['tests', 'tests.*',
+                                     'examples', 'examples.*']),
     data_files=[
         (os.path.join('share', 'ament_index', 'resource_index', 'packages'),
          [os.path.join('resource', package_name)]),

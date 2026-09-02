@@ -67,6 +67,55 @@ HAND_TOPICS = {
 # --- safety ---------------------------------------------------------------
 KEY_STATUS_TOPIC = '/power/board/key_status'
 
+# --- power / light / sbus / serial (vendor demos 08/14/09/16) -------------
+POWER_TOPICS = {
+    'battery': '/power/battery/status',
+    'board': '/power/board/status',
+    'key_status': KEY_STATUS_TOPIC,
+}
+
+LIGHT_TOPIC = '/xsys/light/ctrl'
+# LightCtrl.cmd presets copied from demo 14.
+LIGHT_CMDS = {
+    'off': 0,
+    'battery_normal': 201,
+    'battery_low': 202,
+    'battery_critical': 203,
+    'charging': 210,
+    'wakeup': 301,
+    'listening': 310,
+    'thinking': 311,
+    'running': 401,
+}
+
+SBUS_TOPIC = '/sbus_data'                   # sensor_msgs/Joy
+SBUS_EVENT_TOPIC = '/sbus_data/event'       # bodyctrl_msgs/SbusData
+
+SERIAL_SERVICE = '/xsys/get_serial_number'
+
+# --- inspire (13-joint) hand (vendor demos 07/15) -------------------------
+# Feedback topics are demo-15-confirmed; clear_error service from demo 07.
+INSPIRE_HAND_TOPICS = {
+    'left': {
+        'angle_cmd': '/left_hand/angle_set',
+        'force_cmd': '/left_hand/force_set',
+        'speed_cmd': '/left_hand/speed_set',
+        'angle_actual': '/left_hand/angle_actual',
+        'force_actual': '/left_hand/force_actual',
+        'touch': '/left_hand/touch_data',
+        'clear_error': '/inspire_hand/set_clear_error/left_hand',
+    },
+    'right': {
+        'angle_cmd': '/right_hand/angle_set',
+        'force_cmd': '/right_hand/force_set',
+        'speed_cmd': '/right_hand/speed_set',
+        'angle_actual': '/right_hand/angle_actual',
+        'force_actual': '/right_hand/force_actual',
+        'touch': '/right_hand/touch_data',
+        'clear_error': '/inspire_hand/set_clear_error/right_hand',
+    },
+}
+
 # --- sim backend ----------------------------------------------------------
 SIM_JOINT_STATE_TOPIC = '/joint_states'        # sensor_msgs/JointState (gz)
 SIM_JOINT_CMD_TOPIC = '/tienkung_dex/joint_cmds'

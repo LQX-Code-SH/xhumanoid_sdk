@@ -150,3 +150,128 @@ class RealDexterousHand(DexterousHandBase):
 
     def on_touch(self, cb: Callable[[TouchReading], None]) -> None:
         self._touch_cbs.append(cb)
+
+
+INSPIRE_JOINT_COUNT = 13
+
+
+class RealInspireHand(DexterousHandBase):
+    """Inspire 13-joint hand (vendor demos 07/15): angle/force/speed_set
+    commands, angle_actual/force_actual/touch_data feedback and the
+    SetClearError service. joint_values are broadcast to all 13 joints
+    like the demo does."""
+
+    def __init__(self, node, side: str, topics: dict, logger):
+        super().__init__(node, side, vendor='inspire')
+        self._topics = topics
+        self._log = logger
+        self._pubs = {}          # 'angle' | 'force' | 'speed' -> publisher
+        self._msg_cls = {}       # same keys -> message classes
+        self._status = None
+        self._clear_cli = None
+        self._clear_srv_cls = None
+        self._touch_cbs: list[Callable[[TouchReading], None]] = []
+
+    def on_start(self) -> None:
+        classes, err = _msgs.inspire_hand_msgs()
+        (angle_cls, force_cls, speed_cls,
+         angle_act_cls, _force_act_cls, touch_cls) = classes
+        if angle_cls is None:
+            raise RuntimeError(f'{self.name}: {err}')
+
+        self._msg_cls = {'angle': angle_cls, 'force': force_cls,
+                         'speed': speed_cls}
+        self._pubs = {
+            'angle': self._node.create_publisher(
+                angle_cls, self._topics['angle_cmd'], 10),
+            'force': self._node.create_publisher(
+                force_cls, self._topics['force_cmd'], 10),
+            'speed': self._node.create_publisher(
+                speed_cls, self._topics['speed_cmd'], 10),
+        }
+        self._sub_angle = self._node.create_subscription(
+            angle_act_cls, self._topics['angle_actual'],
+            self._on_angle_actual, 10)
+        if touch_cls is not None:
+            self._sub_touch = self._node.create_subscription(
+                touch_cls, self._topics['touch'], self._on_touch_msg, 10)
+
+        self._clear_srv_cls, err = _msgs.clear_error_service()
+        if self._clear_srv_cls is not None:
+            self._clear_cli = self._node.create_client(
+                self._clear_srv_cls, self._topics['clear_error'])
+        elif self._log is not None:
+            self._log.warn(f'{self.name}: {err}; clear_error unavailable')
+
+        if self._log is not None:
+            self._log.info(
+                f'{self.name} (inspire): pub {self._topics["angle_cmd"]} '
+                f'+ force/speed, sub {self._topics["angle_actual"]} '
+                f'+ touch')
+
+    def on_stop(self) -> None:
+        self._pubs = {}
+        self._status = None
+
+    @property
+    def is_active(self) -> bool:
+        return self._status is not None
+
+    def _on_angle_actual(self, msg) -> None:
+        values = (getattr(msg, 'joint_values', None)
+                  or getattr(msg, 'angles', None)
+                  or getattr(msg, 'angle', None) or ())
+        positions = tuple(int(v) for v in values)
+        self._status = HandStatus(positions=positions, raw=msg)
+
+    def _on_touch_msg(self, msg) -> None:
+        # TouchData layout is not demo-documented (demo 15 only counts
+        # frames); pass through per-item values when present.
+        items = []
+        for item in getattr(msg, 'data', ()) or ():
+            if hasattr(item, 'value'):
+                items.append((int(item.value),))
+            else:
+                items.append(())
+        for cb in tuple(self._touch_cbs):
+            cb(TouchReading(values=tuple(items)))
+
+    # -- control ----------------------------------------------------------
+    def _joint_values(self, values: Sequence[int], default: int = 0) -> list:
+        padded = list(values) + [default] * (INSPIRE_JOINT_COUNT - len(values))
+        return [int(v) for v in padded[:INSPIRE_JOINT_COUNT]]
+
+    def _publish(self, kind: str, values: Sequence[int]) -> None:
+        if kind not in self._pubs:
+            raise RuntimeError(f'{self.name} not started')
+        msg = self._msg_cls[kind]()
+        msg.hand_id = 1 if self.side == 'left' else 2
+        msg.joint_values = self._joint_values(values)
+        self._pubs[kind].publish(msg)
+
+    def set_positions(self, positions: Sequence[int]) -> None:
+        clipped = tuple(max(0, min(1000, int(p))) for p in positions)
+        self._publish('angle', clipped)
+
+    def set_force(self, forces: Sequence[int]) -> None:
+        self._publish('force', tuple(int(f) for f in forces))
+
+    def set_speed(self, speeds: Sequence[int]) -> None:
+        self._publish('speed', tuple(int(s) for s in speeds))
+
+    def clear_error(self) -> bool:
+        if self._clear_cli is None:
+            return False
+        if not self._clear_cli.wait_for_service(timeout_sec=2.0):
+            if self._log is not None:
+                self._log.error(f'{self.name}: clear_error service '
+                                'not reachable')
+            return False
+        self._clear_cli.call_async(self._clear_srv_cls.Request())
+        return True
+
+    def get_status(self) -> Optional[HandStatus]:
+        return self._status
+
+    def on_touch(self, cb: Callable[[TouchReading], None]) -> None:
+        self._touch_cbs.append(cb)

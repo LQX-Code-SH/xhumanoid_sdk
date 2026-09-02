@@ -110,10 +110,14 @@ class RealAudioSystem(AudioSystemBase):
         ctrl_cls, frame_cls, voice_cls = (None, None, None)
         try:
             import importlib
-            module = importlib.import_module('lyre_msgs')
-            ctrl_cls = getattr(module.srv, 'AudioControl', None)
-            frame_cls = getattr(module.msg, 'AudioFrame', None)
-            voice_cls = getattr(module.msg, 'LyreVoiceActivity', None)
+            # Import the submodules explicitly: an older lyre_msgs prefix on
+            # PYTHONPATH may lack the .srv submodule entirely (observed on the
+            # robot host, /opt/humanoid/install vs ~/xos).
+            srv_mod = importlib.import_module('lyre_msgs.srv')
+            msg_mod = importlib.import_module('lyre_msgs.msg')
+            ctrl_cls = getattr(srv_mod, 'AudioControl', None)
+            frame_cls = getattr(msg_mod, 'AudioFrame', None)
+            voice_cls = getattr(msg_mod, 'LyreVoiceActivity', None)
         except Exception as exc:
             if self._log is not None:
                 self._log.error(f'audio: lyre_msgs not importable ({exc})')

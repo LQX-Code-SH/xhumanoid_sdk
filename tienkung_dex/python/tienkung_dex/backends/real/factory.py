@@ -13,10 +13,14 @@ from tienkung_dex.core.errors import BackendUnavailableError
 
 from .audio import RealAudioSystem
 from .camera import RealCameraStream, RealMultiCameraGroup
-from .hand import RealDexterousHand
+from .hand import RealDexterousHand, RealInspireHand
 from .joint import RealJointGroup, RobotStateCache
+from .light import RealLightControl
+from .power import RealPowerSystem
 from .safety import NullSafetyMonitor, RealSafetyMonitor
+from .sbus import RealSbusStream
 from .sensors import ForceStream, GpsStream, ImuStream, LidarStream
+from .serial import RealSerialNumber
 
 # Subsystems that degrade gracefully when their vendor message package is
 # missing (optional hardware); everything else is core to the real backend.
@@ -24,6 +28,10 @@ OPTIONAL_HAND = 'hand'
 OPTIONAL_AUDIO = 'audio'
 OPTIONAL_GPS = 'gps'
 OPTIONAL_PANORAMA = 'panorama'
+OPTIONAL_POWER = 'power'
+OPTIONAL_LIGHT = 'light'
+OPTIONAL_SBUS = 'sbus'
+OPTIONAL_SERIAL = 'serial'
 
 
 class RealBackendFactory:
@@ -40,6 +48,11 @@ class RealBackendFactory:
         self._hand_vendor = hand_vendor
         self._params = params
 
+        if hand_vendor not in ('brainco', 'inspire'):
+            raise BackendUnavailableError(
+                f'real backend supports hand_vendor="brainco"/"inspire" '
+                f'only, got {hand_vendor!r}')
+
         # Topic overrides (create_robot **topic_overrides)
         self._robot_state_topic = params.get(
             'robot_state_topic', t.ROBOT_STATE_TOPIC)
@@ -47,6 +60,8 @@ class RealBackendFactory:
         self._camera_namespaces = params.get(
             'camera_namespaces', t.CAMERA_NAMESPACES)
         self._hand_topics = params.get('hand_topics', t.HAND_TOPICS)
+        self._inspire_hand_topics = params.get(
+            'inspire_hand_topics', t.INSPIRE_HAND_TOPICS)
         self._tts_service = params.get('tts_service', t.TTS_SERVICE)
         self._audio_control = params.get(
             'audio_control_service', t.AUDIO_CONTROL_SERVICE)
@@ -56,6 +71,11 @@ class RealBackendFactory:
             'voice_activity_topic', t.VOICE_ACTIVITY_TOPIC)
         self._key_status_topic = params.get(
             'key_status_topic', t.KEY_STATUS_TOPIC)
+        self._power_topics = params.get('power_topics', t.POWER_TOPICS)
+        self._light_topic = params.get('light_topic', t.LIGHT_TOPIC)
+        self._sbus_topics = params.get('sbus_topics', {
+            'joy': t.SBUS_TOPIC, 'event': t.SBUS_EVENT_TOPIC})
+        self._serial_service = params.get('serial_service', t.SERIAL_SERVICE)
         self._lidar_topic = params.get('lidar_topic', t.LIDAR_TOPIC)
         self._imu_source = params.get('imu_source', 'xsens')
         self._imu_topic = params.get('imu_topic', t.IMU_TOPIC_LIVOX)
@@ -71,6 +91,7 @@ class RealBackendFactory:
         self._tts_timeout = params.get('service.tts_timeout', 3.0)
         self._buffer_sec = params.get('recording.buffer_sec', 60.0)
         self._pair_window = params.get('camera.pair_window', 0.05)
+        self._power_timeout = params.get('power.stale_timeout', 5.0)
 
     def _wanted(self, key: str) -> bool:
         return self._enable is None or key in self._enable
@@ -124,18 +145,24 @@ class RealBackendFactory:
                 prefix=self._panorama_prefix, logger=self._log,
                 use_compressed=self._panorama_compressed)
 
-        # Hands (optional vendor package).
+        # Hands (optional vendor package; vendor routed by hand_vendor).
         if self._wanted(OPTIONAL_HAND):
             try:
                 for side in ('left', 'right'):
-                    hand = RealDexterousHand(
-                        self._node, side,
-                        topics=self._hand_topics[side], logger=self._log)
+                    if self._hand_vendor == 'inspire':
+                        hand = RealInspireHand(
+                            self._node, side,
+                            topics=self._inspire_hand_topics[side],
+                            logger=self._log)
+                    else:
+                        hand = RealDexterousHand(
+                            self._node, side,
+                            topics=self._hand_topics[side], logger=self._log)
                     subsystems[f'hand_{side}'] = hand
             except Exception as exc:
                 self._log.error(
-                    f'hand: brainco_hand_msgs unavailable ({exc}); '
-                    'hands left as None')
+                    f'hand ({self._hand_vendor}): vendor message package '
+                    f'unavailable ({exc}); hands left as None')
 
         # Audio (interaction_msgs + lyre_msgs; degrades to speak()=False).
         if self._wanted(OPTIONAL_AUDIO):
@@ -147,6 +174,22 @@ class RealBackendFactory:
                 voice_activity=self._voice_topic,
                 buffer_sec=self._buffer_sec,
                 tts_timeout=self._tts_timeout)
+
+        # Power / light / sbus / serial (bodyctrl_msgs / xsys_msgs; all
+        # degrade internally to inactive when their package is missing).
+        if self._wanted(OPTIONAL_POWER):
+            subsystems['power'] = RealPowerSystem(
+                self._node, topics=self._power_topics, logger=self._log,
+                stale_timeout=self._power_timeout)
+        if self._wanted(OPTIONAL_LIGHT):
+            subsystems['light'] = RealLightControl(
+                self._node, self._light_topic, logger=self._log)
+        if self._wanted(OPTIONAL_SBUS):
+            subsystems['sbus'] = RealSbusStream(
+                self._node, topics=self._sbus_topics, logger=self._log)
+        if self._wanted(OPTIONAL_SERIAL):
+            subsystems['serial'] = RealSerialNumber(
+                self._node, self._serial_service, logger=self._log)
 
         # Sensors.
         if self._wanted('imu'):

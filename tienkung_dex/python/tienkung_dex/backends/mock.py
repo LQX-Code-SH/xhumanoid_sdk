@@ -19,11 +19,14 @@ from tienkung_dex.core.base import (AudioSystemBase, CameraStreamBase,
                                     DexterousHandBase, ForceStreamBase,
                                     GpsStreamBase, ImuStreamBase,
                                     JointGroupBase, LidarStreamBase,
-                                    MultiCameraGroupBase, SafetyMonitorBase)
+                                    LightControlBase, MultiCameraGroupBase,
+                                    PowerSystemBase, SafetyMonitorBase,
+                                    SbusStreamBase, SerialNumberBase)
 from tienkung_dex.core.ring import AudioRingBuffer
 from tienkung_dex.core.types import (AudioChunk, CameraFrame, ControlMode,
                                      GpsFixReading, HandStatus, ImuReading,
-                                     JointCommand, JointReading, TouchReading,
+                                     JointCommand, JointReading,
+                                     PowerReading, SbusReading, TouchReading,
                                      WrenchReading)
 
 
@@ -358,6 +361,9 @@ class MockDexterousHand(DexterousHandBase):
     def set_speed(self, speeds: Sequence[int]) -> None:
         pass
 
+    def clear_error(self) -> bool:
+        return True
+
     def get_status(self) -> Optional[HandStatus]:
         return HandStatus(positions=self._positions)
 
@@ -479,6 +485,115 @@ class MockForceStream(ForceStreamBase):
         return self._latest
 
 
+class MockPowerSystem(PowerSystemBase):
+    """Injection-driven power readings."""
+
+    def __init__(self, node, logger=None):
+        super().__init__(node)
+        self._log = logger
+        self._latest = None
+
+    def on_start(self) -> None:
+        pass
+
+    def on_stop(self) -> None:
+        self._latest = None
+
+    @property
+    def is_active(self) -> bool:
+        return self._latest is not None
+
+    def inject(self, reading: PowerReading) -> None:
+        self._latest = reading
+        self._emit(reading)
+
+    def latest(self) -> Optional[PowerReading]:
+        return self._latest
+
+
+class MockLightControl(LightControlBase):
+    """Command-recording light strip."""
+
+    def __init__(self, node, logger=None):
+        super().__init__(node)
+        self._log = logger
+        self.commands: list[tuple] = []      # history of (cmd, data)
+        self._ready = False
+
+    def on_start(self) -> None:
+        self._ready = True
+
+    def on_stop(self) -> None:
+        self._ready = False
+
+    @property
+    def is_active(self) -> bool:
+        return self._ready
+
+    def set_cmd(self, cmd: int, data: Sequence[int] = ()) -> None:
+        self.commands.append((int(cmd), tuple(int(d) for d in data)))
+
+    def set_mode(self, mode: str) -> bool:
+        from tienkung_dex.core import topics as t
+        cmd = t.LIGHT_CMDS.get(mode)
+        if cmd is None:
+            return False
+        self.set_cmd(cmd)
+        return True
+
+
+class MockSbusStream(SbusStreamBase):
+    """Injection-driven RC receiver."""
+
+    def __init__(self, node, logger=None):
+        super().__init__(node)
+        self._log = logger
+        self._latest = None
+
+    def on_start(self) -> None:
+        pass
+
+    def on_stop(self) -> None:
+        self._latest = None
+
+    @property
+    def is_active(self) -> bool:
+        return self._latest is not None
+
+    def inject(self, reading: SbusReading) -> None:
+        self._latest = reading
+        self._emit(reading)
+
+    def latest(self) -> Optional[SbusReading]:
+        return self._latest
+
+
+class MockSerialNumber(SerialNumberBase):
+    """Programmable serial number service stub."""
+
+    def __init__(self, node, logger=None, serial: str = 'MOCK-SN-0000'):
+        super().__init__(node)
+        self._log = logger
+        self._serial = serial
+        self._ready = False
+
+    def on_start(self) -> None:
+        self._ready = True
+
+    def on_stop(self) -> None:
+        self._ready = False
+
+    @property
+    def is_active(self) -> bool:
+        return self._ready
+
+    def set_serial(self, serial: str) -> None:
+        self._serial = serial
+
+    def get_serial_number(self, timeout: float = 5.0) -> Optional[str]:
+        return self._serial
+
+
 class MockBackendFactory:
     """Headless factory: builds the full mock subsystem set.
 
@@ -529,6 +644,14 @@ class MockBackendFactory:
             subsystems['audio'] = MockAudioSystem(
                 self._node, logger=self._log,
                 buffer_sec=self._params.get('recording.buffer_sec', 60.0))
+        if self._wanted('power'):
+            subsystems['power'] = MockPowerSystem(self._node, logger=self._log)
+        if self._wanted('light'):
+            subsystems['light'] = MockLightControl(self._node, logger=self._log)
+        if self._wanted('sbus'):
+            subsystems['sbus'] = MockSbusStream(self._node, logger=self._log)
+        if self._wanted('serial'):
+            subsystems['serial'] = MockSerialNumber(self._node, logger=self._log)
         if self._wanted('imu'):
             subsystems['imu'] = MockImuStream(self._node, logger=self._log)
         if self._wanted('lidar'):

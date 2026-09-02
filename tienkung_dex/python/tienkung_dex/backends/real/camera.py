@@ -149,6 +149,7 @@ class RealCameraStream(CameraStreamBase):
             return
         stamp = trigger_stamp
         color_arr = depth_arr = None
+        frame_id = self.namespace
         if color is not None:
             color_arr, color_stamp, frame_id = color
         if depth is not None:
@@ -166,7 +167,6 @@ class RealCameraStream(CameraStreamBase):
             stamp = depth_stamp
         elif depth is None:
             stamp = color_stamp
-            frame_id = self.namespace
 
         frame = CameraFrame(color=color_arr, depth=depth_arr,
                             stamp=stamp, frame_id=frame_id)

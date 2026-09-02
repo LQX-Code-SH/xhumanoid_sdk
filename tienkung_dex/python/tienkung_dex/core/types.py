@@ -167,3 +167,34 @@ class WrenchReading:
     tz: float = 0.0
     stamp: Optional[object] = None
     frame_id: str = ''
+
+
+@dataclass(frozen=True)
+class PowerReading:
+    """Power snapshot from /power/battery|board/status (vendor demo 08).
+
+    Battery fields are the master-battery values the demo prints
+    (voltage/current/power); key fields come from /power/board/key_status
+    and share the safety monitor's std_msgs/Bool unwrap semantics.
+    """
+
+    voltage: float = 0.0        # master battery voltage (V)
+    current: float = 0.0        # master battery current (A)
+    power_w: float = 0.0        # master battery power (W)
+    is_estop: bool = False      # e-stop button
+    is_power_on: bool = False   # power supply state
+    stamp: Optional[object] = None
+
+
+@dataclass(frozen=True)
+class SbusReading:
+    """RC transmitter snapshot (vendor demo 09): joy axes + button events.
+
+    axes follows sensor_msgs/Joy (/sbus_data); buttons holds the raw
+    button_a..button_f fields of bodyctrl_msgs/SbusData (/sbus_data/event)
+    and stays empty when the vendor message package is unavailable.
+    """
+
+    axes: Tuple[float, ...] = ()
+    buttons: Tuple[int, ...] = ()   # (A, B, C, D, E, F)
+    stamp: Optional[object] = None

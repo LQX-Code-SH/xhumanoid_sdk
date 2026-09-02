@@ -58,6 +58,12 @@ class TienkungDex:
         self.gps = _take('gps')
         self.force = _take('force')
 
+        # Power / light / RC / robot identity (vendor demos 08/14/09/16).
+        self.power = _take('power')
+        self.light = _take('light')
+        self.sbus = _take('sbus')
+        self.serial = _take('serial')
+
     # -- lifecycle (Template Method over the subsystem set) ---------------
     def start(self) -> None:
         """Start subsystems in dependency order (safety/state first)."""
@@ -128,12 +134,14 @@ def create_robot(node, backend: str = 'real', *,
     backend : 'real' (SDK topics, robot host) | 'sim' (ros_gz bridge
               topics) | 'mock' (headless in-process, unit tests)
     enable  : subset of {'joint','camera','hand','audio','safety','imu',
-              'lidar','gps','force','panorama'} - None builds everything
-              (panorama excluded by default: optional hardware)
+              'lidar','gps','force','power','light','sbus','serial',
+              'panorama'} - None builds everything (panorama excluded by
+              default: optional hardware)
     **topic_overrides : per-robot topic names overriding core/topics.py
     """
     default_enable = {'joint', 'camera', 'hand', 'audio', 'safety',
-                      'imu', 'lidar', 'gps', 'force'}
+                      'imu', 'lidar', 'gps', 'force', 'power', 'light',
+                      'sbus', 'serial'}
     enable = set(enable) if enable is not None else set(default_enable)
 
     joints_table = load_joints_table(path=joints_table_path,

@@ -41,16 +41,22 @@ def joint_cmd_msg(group: str):
 
 def key_status_msg():
     """E-stop message class name is not pinned by the demos (HWI §7.1
-    documents the fields is_estop / is_remote_estop only); probe the usual
-    candidates. Returns the first class exposing is_estop."""
+    documents the fields is_estop / is_remote_estop only). The real robot
+    publishes bodyctrl_msgs/msg/PowerBoardKeyStatus on /power/board/key_status
+    (verified on the Tienkung 3.0 host); probe that first, then the
+    ros2_bridge_msgs candidates. Returns the first class exposing is_estop."""
+    msg, err = _resolve_msg('bodyctrl_msgs', 'PowerBoardKeyStatus')
+    if msg is not None and hasattr(msg, 'is_estop'):
+        return msg, ''
     candidates = ('KeyStatus', 'PowerKeyStatus', 'BoardKeyStatus',
                   'EstopStatus', 'PowerBoardStatus')
     for name in candidates:
         msg, err = _resolve_msg('ros2_bridge_msgs', name)
         if msg is not None and hasattr(msg, 'is_estop'):
             return msg, ''
-    return None, (f'no e-stop message exposing is_estop among {candidates} '
-                  'in ros2_bridge_msgs.msg')
+    return None, (f'no e-stop message exposing is_estop among '
+                  'bodyctrl_msgs.PowerBoardKeyStatus and the '
+                  f'ros2_bridge_msgs candidates {candidates}')
 
 
 def hand_msgs():
@@ -89,3 +95,60 @@ def force_msg():
         return module.WrenchStamped, ''
     except Exception as exc:
         return None, f'force message unavailable ({exc})'
+
+
+def power_msgs():
+    """(PowerBatteryStatus, PowerStatus, PowerBoardKeyStatus) tuple from
+    bodyctrl_msgs (vendor demo 08); (None, ...) + error when missing."""
+    battery, e1 = _resolve_msg('bodyctrl_msgs', 'PowerBatteryStatus')
+    board, e2 = _resolve_msg('bodyctrl_msgs', 'PowerStatus')
+    key, e3 = _resolve_msg('bodyctrl_msgs', 'PowerBoardKeyStatus')
+    errors = [e for e in (e1, e2, e3) if e]
+    return (battery, board, key), (errors[0] if errors else '')
+
+
+def light_msg():
+    return _resolve_msg('bodyctrl_msgs', 'LightCtrl')
+
+
+def sbus_event_msg():
+    return _resolve_msg('bodyctrl_msgs', 'SbusData')
+
+
+def serial_service():
+    try:
+        module = importlib.import_module('xsys_msgs.srv')
+    except Exception as exc:
+        return None, f'xsys_msgs not importable ({exc})'
+    if hasattr(module, 'GetSerialNumber'):
+        return getattr(module, 'GetSerialNumber'), ''
+    return None, 'GetSerialNumber not found in xsys_msgs.srv'
+
+
+def inspire_hand_msgs():
+    """(SetAngle, SetForce, SetSpeed, GetAngleAct, GetForceAct, TouchData)
+    from inspire_hand_msgs (vendor demos 07/15); TouchData is optional."""
+    names = ('SetAngle', 'SetForce', 'SetSpeed',
+             'GetAngleAct', 'GetForceAct', 'TouchData')
+    try:
+        module = importlib.import_module('inspire_hand_msgs.msg')
+    except Exception as exc:
+        return (None,) * len(names), \
+            f'inspire_hand_msgs not importable ({exc})'
+    classes = [getattr(module, n, None) for n in names]
+    missing = [n for n, c in zip(names, classes) if c is None]
+    if missing:
+        return (None,) * len(names), \
+            f'missing in inspire_hand_msgs.msg: {missing}'
+    return tuple(classes), ''
+
+
+def clear_error_service():
+    """SetClearError service (vendor demo 07, bodyctrl_msgs)."""
+    try:
+        module = importlib.import_module('bodyctrl_msgs.srv')
+    except Exception as exc:
+        return None, f'bodyctrl_msgs not importable ({exc})'
+    if hasattr(module, 'SetClearError'):
+        return getattr(module, 'SetClearError'), ''
+    return None, 'SetClearError not found in bodyctrl_msgs.srv'

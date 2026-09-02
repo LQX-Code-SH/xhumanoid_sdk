@@ -32,6 +32,8 @@ from .types import (
     ImuReading,
     JointCommand,
     JointReading,
+    PowerReading,
+    SbusReading,
     TouchReading,
     WrenchReading,
 )
@@ -248,6 +250,11 @@ class DexterousHandBase(SubsystemBase):
     def set_speed(self, speeds: Sequence[int]) -> None:
         """Vendor speed setpoints."""
 
+    def clear_error(self) -> bool:
+        """Vendor clear-error service (inspire hands); False when
+        unsupported by the backend/vendor."""
+        return False
+
     @abstractmethod
     def get_status(self) -> Optional[HandStatus]:
         """Cached latest motor status."""
@@ -347,7 +354,8 @@ class ImuStreamBase(SubsystemBase, _Observable):
     """Unified IMU stream (design doc §4.7)."""
 
     def __init__(self, node, source: str, name: str = 'imu'):
-        super().__init__(node, name)
+        SubsystemBase.__init__(self, node, name)
+        _Observable.__init__(self)
         self.source = source
 
     def on_reading(self, cb: Callable[[ImuReading], None]) -> None:
@@ -360,6 +368,10 @@ class ImuStreamBase(SubsystemBase, _Observable):
 class LidarStreamBase(SubsystemBase, _Observable):
     """Livox lidar point cloud stream (design doc §4.7)."""
 
+    def __init__(self, node, name: str = 'lidar'):
+        SubsystemBase.__init__(self, node, name)
+        _Observable.__init__(self)
+
     def on_cloud(self, cb: Callable[[object], None]) -> None:
         """cb(sensor_msgs.PointCloud2) - standard message, passed through."""
         self.on(cb)
@@ -370,6 +382,10 @@ class LidarStreamBase(SubsystemBase, _Observable):
 
 class GpsStreamBase(SubsystemBase, _Observable):
     """GPS stream, optional hardware (design doc §4.7)."""
+
+    def __init__(self, node, name: str = 'gps'):
+        SubsystemBase.__init__(self, node, name)
+        _Observable.__init__(self)
 
     def on_fix(self, cb: Callable[[GpsFixReading], None]) -> None:
         self.on(cb)
@@ -385,11 +401,80 @@ class ForceStreamBase(SubsystemBase, _Observable):
     is_active stays False - never raises.
     """
 
+    def __init__(self, node, name: str = 'force'):
+        SubsystemBase.__init__(self, node, name)
+        _Observable.__init__(self)
+
     def on_wrench(self, cb: Callable[[WrenchReading], None]) -> None:
         self.on(cb)
 
     @abstractmethod
     def latest(self) -> Optional[WrenchReading]: ...
+
+
+class PowerSystemBase(SubsystemBase, _Observable):
+    """Battery / power-board monitoring (vendor demo 08).
+
+    Degrades like the optional sensor streams: while the vendor message
+    package is absent latest() stays None and is_active stays False.
+    """
+
+    def __init__(self, node, name: str = 'power'):
+        SubsystemBase.__init__(self, node, name)
+        _Observable.__init__(self)
+
+    def on_update(self, cb: Callable[[PowerReading], None]) -> None:
+        self.on(cb)
+
+    @abstractmethod
+    def latest(self) -> Optional[PowerReading]: ...
+
+
+class LightControlBase(SubsystemBase):
+    """Light-strip control over /xsys/light/ctrl (vendor demo 14).
+
+    set_mode() accepts the named presets (battery_normal, wakeup, ...);
+    set_cmd() sends the raw LightCtrl cmd value. Pure publish path -
+    is_active reflects whether the publisher was created.
+    """
+
+    def __init__(self, node, name: str = 'light'):
+        super().__init__(node, name)
+
+    def set_mode(self, mode: str) -> bool:
+        """Named preset; False when unknown. Presets live in core/topics."""
+        return False
+
+    @abstractmethod
+    def set_cmd(self, cmd: int, data: Sequence[int] = ()) -> None: ...
+
+
+class SbusStreamBase(SubsystemBase, _Observable):
+    """RC SBUS receiver (vendor demo 09): Joy axes + button events."""
+
+    def __init__(self, node, name: str = 'sbus'):
+        SubsystemBase.__init__(self, node, name)
+        _Observable.__init__(self)
+
+    def on_update(self, cb: Callable[[SbusReading], None]) -> None:
+        self.on(cb)
+
+    @abstractmethod
+    def latest(self) -> Optional[SbusReading]: ...
+
+
+class SerialNumberBase(SubsystemBase):
+    """Robot serial number service /xsys/get_serial_number (vendor demo 16).
+
+    is_active reflects whether the service was reachable; get_serial_number
+    returns None on any failure instead of raising.
+    """
+
+    def __init__(self, node, name: str = 'serial'):
+        super().__init__(node, name)
+
+    @abstractmethod
+    def get_serial_number(self, timeout: float = 5.0) -> Optional[str]: ...
 
 
 __all__ = [
@@ -404,4 +489,8 @@ __all__ = [
     'LidarStreamBase',
     'GpsStreamBase',
     'ForceStreamBase',
+    'PowerSystemBase',
+    'LightControlBase',
+    'SbusStreamBase',
+    'SerialNumberBase',
 ]

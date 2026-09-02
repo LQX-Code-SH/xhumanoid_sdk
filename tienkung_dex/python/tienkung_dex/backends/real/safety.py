@@ -16,6 +16,20 @@ from tienkung_dex.core.errors import EstopActiveError
 from . import _msgs
 
 
+def _bool_field(msg, name: str, default: bool = False) -> bool:
+    """Read a vendor bool field that may be plain bool or std_msgs/Bool.
+
+    PowerBoardKeyStatus declares is_estop etc. as std_msgs/Bool: the
+    attribute is a wrapper OBJECT whose truthiness is always True - the
+    real value lives in .data. Never bool() the object itself.
+    """
+    value = getattr(msg, name, None)
+    if value is None:
+        return default
+    data = getattr(value, 'data', value)
+    return bool(data)
+
+
 class RealSafetyMonitor(SafetyMonitorBase):
     """Subscribes key_status; edge-triggered on_estop callbacks."""
 
@@ -50,8 +64,8 @@ class RealSafetyMonitor(SafetyMonitorBase):
         return self._sub is not None
 
     def _on_key_status(self, msg) -> None:
-        estop = bool(getattr(msg, 'is_estop', False))
-        remote = bool(getattr(msg, 'is_remote_estop', False))
+        estop = _bool_field(msg, 'is_estop')
+        remote = _bool_field(msg, 'is_remote_estop')
         combined = estop or remote
         previous = self._estopped or self._remote
         import time

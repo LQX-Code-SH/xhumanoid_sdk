@@ -13,6 +13,8 @@ import numpy as np
 from tienkung_dex.backends.real.audio import parse_voice_activity
 from tienkung_dex.backends.real.camera import decode_color, decode_depth
 from tienkung_dex.backends.real.joint import parse_robot_state
+from tienkung_dex.backends.real.power import parse_battery
+from tienkung_dex.backends.real.safety import _bool_field
 from tienkung_dex.backends.real.sensors import quaternion_to_euler
 
 
@@ -123,3 +125,30 @@ def test_voice_activity_non_aiui_and_invalid():
     assert parse_voice_activity('{"type":"other"}')['event_type'] == -1
     assert parse_voice_activity('not json') is None
     assert parse_voice_activity('') is None
+
+
+def test_parse_battery_master_fields():
+    msg = SimpleNamespace(master_battery_voltage=48.2,
+                          master_battery_current=-1.5,
+                          master_battery_power=72.3)
+    assert parse_battery(msg) == (48.2, -1.5, 72.3)
+
+
+def test_parse_battery_missing_fields_default_zero():
+    assert parse_battery(SimpleNamespace()) == (0.0, 0.0, 0.0)
+
+
+def test_bool_field_std_msgs_wrapper_unwraps_data():
+    # PowerBoardKeyStatus declares is_estop as std_msgs/Bool: the object is
+    # always truthy, the real value lives in .data (regression: facade
+    # permanently reported e-stop active).
+    msg = SimpleNamespace(is_estop=SimpleNamespace(data=False),
+                          is_remote_estop=SimpleNamespace(data=True))
+    assert _bool_field(msg, 'is_estop') is False
+    assert _bool_field(msg, 'is_remote_estop') is True
+
+
+def test_bool_field_plain_bool_and_missing_field():
+    msg = SimpleNamespace(is_estop=True)
+    assert _bool_field(msg, 'is_estop') is True
+    assert _bool_field(msg, 'is_remote_estop') is False
