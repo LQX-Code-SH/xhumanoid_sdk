@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Real power monitoring (vendor demo 08): battery + board + key status.
+"""Real power monitoring : battery + board + key status.
 
 PowerBatteryStatus fields (demo-confirmed): master_battery_voltage / V,
 master_battery_current / A, master_battery_power / W. The board status is
@@ -89,7 +89,11 @@ class RealPowerSystem(PowerSystemBase):
     def _on_key(self, msg) -> None:
         self._is_estop = _bool_field(msg, 'is_estop')
         self._is_power_on = _bool_field(msg, 'is_power_on')
-        self._emit(self.latest())
+        # latest() is None until the first battery message: emitting None
+        # would violate the on_update(PowerReading) contract.
+        reading = self.latest()
+        if reading is not None:
+            self._emit(reading)
 
     def latest(self) -> Optional[PowerReading]:
         if self._last_seen is None:

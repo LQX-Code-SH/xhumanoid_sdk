@@ -13,6 +13,7 @@ camera.pair_window seconds (ROS 2 Image has no sequence field).
 
 from __future__ import annotations
 
+import threading
 import time
 from collections import deque
 from typing import Callable, Optional
@@ -100,6 +101,7 @@ class RealCameraStream(CameraStreamBase):
         self._depth = None
         self._frame = None
         self._stamps: deque[float] = deque()
+        self._lock = threading.Lock()   # color/depth callbacks may race
 
     def on_start(self) -> None:
         from sensor_msgs.msg import Image
@@ -130,8 +132,8 @@ class RealCameraStream(CameraStreamBase):
                     self._log.warn(f'{self.name}: unsupported color '
                                    f'encoding {msg.encoding}')
                 return
-            self._color = (array, msg.header.stamp,
-                           msg.header.frame_id or self.namespace)
+            payload = (array, msg.header.stamp,
+                       msg.header.frame_id or self.namespace)
         else:
             array = decode_depth(msg)
             if array is None:
@@ -139,55 +141,81 @@ class RealCameraStream(CameraStreamBase):
                     self._log.warn(f'{self.name}: unsupported depth '
                                    f'encoding {msg.encoding}')
                 return
-            self._depth = (array, msg.header.stamp)
-        self._pair_and_emit(msg.header.stamp)
+            payload = (array, msg.header.stamp)
+        frame = self._pair_and_emit(kind, payload)
+        if frame is not None:
+            self._emit(frame)
 
-    def _pair_and_emit(self, trigger_stamp) -> None:
-        color = self._color
-        depth = self._depth
-        if color is None and depth is None:
-            return
-        stamp = trigger_stamp
-        color_arr = depth_arr = None
-        frame_id = self.namespace
-        if color is not None:
-            color_arr, color_stamp, frame_id = color
-        if depth is not None:
-            depth_arr, depth_stamp = depth
-        # Nearest-neighbour pairing: use the freshest of the two stamps and
-        # require both planes (when present) to be within the pair window.
-        if color is not None and depth is not None:
-            if abs(_stamp_sec(color_stamp) - _stamp_sec(depth_stamp)) \
-                    > self._pair_window:
-                return
-            stamp = (color_stamp
-                     if _stamp_sec(color_stamp) >= _stamp_sec(depth_stamp)
-                     else depth_stamp)
-        elif color is None:
-            stamp = depth_stamp
-        elif depth is None:
-            stamp = color_stamp
+    def _pair_and_emit(self, kind: str, payload) -> Optional[CameraFrame]:
+        """Store the incoming plane and return the frame to emit.
 
-        frame = CameraFrame(color=color_arr, depth=depth_arr,
-                            stamp=stamp, frame_id=frame_id)
-        self._frame = frame
-        now = time.monotonic()
-        self._stamps.append(now)
-        while self._stamps and now - self._stamps[0] > self._rate_window:
-            self._stamps.popleft()
-        self._emit(frame)
+        Lock-protected: color and depth callbacks may run concurrently under
+        a MultiThreadedExecutor; observers are invoked by the caller OUTSIDE
+        the lock (callbacks must never run with it held).
+        """
+        with self._lock:
+            if kind == 'color':
+                self._color = payload
+            else:
+                self._depth = payload
+            color = self._color
+            depth = self._depth
+
+            stamp = payload[1]
+            color_arr = depth_arr = None
+            frame_id = self.namespace
+
+            if color is not None and depth is not None:
+                color_arr, color_stamp, frame_id = color
+                depth_arr, depth_stamp = depth
+                # Nearest-neighbour pairing: require both planes within the
+                # pair window; the older plane beyond it is a drop-out -
+                # discard it and emit a single-plane frame instead of
+                # blocking the stream forever (CameraFrame contract,
+                # types.py).
+                if abs(_stamp_sec(color_stamp) - _stamp_sec(depth_stamp)) \
+                        > self._pair_window:
+                    if _stamp_sec(color_stamp) > _stamp_sec(depth_stamp):
+                        self._depth = None      # stale depth: color-only
+                        depth_arr = None
+                        stamp = color_stamp
+                    else:
+                        self._color = None      # stale color: depth-only
+                        color_arr = None
+                        frame_id = self.namespace
+                        stamp = depth_stamp
+                else:
+                    stamp = (color_stamp
+                             if _stamp_sec(color_stamp)
+                             >= _stamp_sec(depth_stamp)
+                             else depth_stamp)
+            elif color is not None:
+                color_arr, stamp, frame_id = color
+            else:
+                depth_arr, stamp = depth
+
+            frame = CameraFrame(color=color_arr, depth=depth_arr,
+                                stamp=stamp, frame_id=frame_id)
+            self._frame = frame
+            now = time.monotonic()
+            self._stamps.append(now)
+            while self._stamps and now - self._stamps[0] > self._rate_window:
+                self._stamps.popleft()
+            return frame
 
     def latest(self) -> Optional[CameraFrame]:
-        return self._frame
+        with self._lock:
+            return self._frame
 
     @property
     def frame_rate(self) -> Optional[float]:
-        if len(self._stamps) < 2:
-            return None
-        span = self._stamps[-1] - self._stamps[0]
-        if span <= 0:
-            return None
-        return (len(self._stamps) - 1) / span
+        with self._lock:
+            if len(self._stamps) < 2:
+                return None
+            span = self._stamps[-1] - self._stamps[0]
+            if span <= 0:
+                return None
+            return (len(self._stamps) - 1) / span
 
 
 class RealMultiCameraGroup(MultiCameraGroupBase):

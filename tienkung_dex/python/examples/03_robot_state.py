@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""01 关节状态订阅（vendor demo 01 robot_state 对应）。
+"""03 关节状态订阅。
 
 mock:  move_to 产生状态快照，验证 get_state/get_states/on_state。
 real:  spin 5 秒统计 arm/head/waist/leg 四组的 /robot_state 快照。
 
 用法:
-    python3 examples/01_robot_state.py                    # mock（默认）
-    python3 examples/01_robot_state.py --backend real     # 真机
+    python3 examples/03_robot_state.py                    # mock（默认）
+    python3 examples/03_robot_state.py --backend real     # 真机
 """
 
 import sys

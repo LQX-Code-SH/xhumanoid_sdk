@@ -104,7 +104,7 @@ class DemoBase(TienkungDex):
 
     def joint_move_demo(self, group_name: str, targets: dict[int, float],
                         mode: str = 'pos') -> None:
-        """03~06 共用流程：到位检查 → 回零（vendor demo 的 homing）。"""
+        """16~19 共用流程：到位检查 → 回零（homing）。"""
         group = getattr(self, group_name)
         print(f'  {group_name} 目标 {targets} (mode={mode})')
         if mode == 'imp':

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""05 腰部关节控制（vendor demo 05 对应：pos / imp + 回零）。
+"""17 腰部关节控制（pos / imp + 回零）。
 
 用法:
-    python3 examples/05_waist_control_demo.py                 # mock
-    python3 examples/05_waist_control_demo.py --backend real --mode imp
+    python3 examples/17_waist_control_demo.py                 # mock
+    python3 examples/17_waist_control_demo.py --backend real --mode imp
 """
 
 import sys

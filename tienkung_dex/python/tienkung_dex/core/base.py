@@ -40,7 +40,14 @@ from .types import (
 
 
 class SubsystemBase(ABC):
-    """Template Method lifecycle shared by every subsystem."""
+    """Template Method lifecycle shared by every subsystem.
+
+    Lifecycle is ONE-SHOT: on_stop drops references without destroying the
+    underlying rclpy entities (publishers/subscriptions stay registered on
+    the node), so a stop -> start cycle would create DUPLICATE handles and
+    observer registrations. For a fresh lifecycle rebuild the facade via
+    create_robot(); node destruction is the resource cleanup point.
+    """
 
     def __init__(self, node, name: str):
         self._node = node
@@ -301,12 +308,19 @@ class AudioSystemBase(SubsystemBase):
 
     def speak(self, text: str, blocking: bool = False,
               timeout: float = 3.0) -> bool:
-        """TTS text playback; False on any failure (no retry, no raise)."""
+        """TTS text playback; False on any failure (no retry, no raise).
+
+        With blocking=True the implementation spins the node internally -
+        MUST be called from outside the executor spin thread (calling it
+        from inside a subscription/service callback deadlocks or raises).
+        """
         raise NotImplementedError
 
     def play_file(self, path: str, blocking: bool = False,
                   timeout: float = 3.0) -> bool:
-        """Play a local audio file through the TTS service."""
+        """Play a local audio file through the TTS service.
+
+        Same blocking constraint as speak(blocking=True)."""
         raise NotImplementedError
 
     def stop_playback(self) -> bool:
@@ -413,7 +427,7 @@ class ForceStreamBase(SubsystemBase, _Observable):
 
 
 class PowerSystemBase(SubsystemBase, _Observable):
-    """Battery / power-board monitoring (vendor demo 08).
+    """Battery / power-board monitoring .
 
     Degrades like the optional sensor streams: while the vendor message
     package is absent latest() stays None and is_active stays False.
@@ -431,7 +445,7 @@ class PowerSystemBase(SubsystemBase, _Observable):
 
 
 class LightControlBase(SubsystemBase):
-    """Light-strip control over /xsys/light/ctrl (vendor demo 14).
+    """Light-strip control over /xsys/light/ctrl .
 
     set_mode() accepts the named presets (battery_normal, wakeup, ...);
     set_cmd() sends the raw LightCtrl cmd value. Pure publish path -
@@ -450,7 +464,7 @@ class LightControlBase(SubsystemBase):
 
 
 class SbusStreamBase(SubsystemBase, _Observable):
-    """RC SBUS receiver (vendor demo 09): Joy axes + button events."""
+    """RC SBUS receiver : Joy axes + button events."""
 
     def __init__(self, node, name: str = 'sbus'):
         SubsystemBase.__init__(self, node, name)
@@ -464,7 +478,7 @@ class SbusStreamBase(SubsystemBase, _Observable):
 
 
 class SerialNumberBase(SubsystemBase):
-    """Robot serial number service /xsys/get_serial_number (vendor demo 16).
+    """Robot serial number service /xsys/get_serial_number .
 
     is_active reflects whether the service was reachable; get_serial_number
     returns None on any failure instead of raising.
@@ -474,7 +488,10 @@ class SerialNumberBase(SubsystemBase):
         super().__init__(node, name)
 
     @abstractmethod
-    def get_serial_number(self, timeout: float = 5.0) -> Optional[str]: ...
+    def get_serial_number(self, timeout: float = 5.0) -> Optional[str]:
+        """Blocking service call - MUST be invoked outside the executor
+        spin thread (the implementation spins the node internally)."""
+        ...
 
 
 __all__ = [

@@ -1,13 +1,19 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""15 灵巧手状态与触觉（vendor demo 15 对应：motor_status + touch）。
+"""12 灵巧手状态与触觉（get_status + on_touch，双厂商共用）。
+
+get_status / on_touch 是两厂商的真实接口交集，故共用一个脚本：
+- brainco: MotorStatus positions[6]；TouchStatus 每指五元组
+  （法向/切向力、切向方向、接近、状态）。
+- inspire: angle_actual joint_values[13]；TouchData 布局未文档化
+  （仅透传数值）。
 
 mock:  inject_touch 验证 on_touch 回调；set_positions 后核对 get_status。
-real:  spin 5 秒订阅手部状态话题（inspire: angle_actual/touch_data）。
+real:  spin 5 秒订阅手部状态话题。
 
 用法:
-    python3 examples/15_hand_state_demo.py
-    python3 examples/15_hand_state_demo.py --backend real --hand-vendor inspire
+    python3 examples/12_hand_state_demo.py
+    python3 examples/12_hand_state_demo.py --backend real --hand-vendor inspire
 """
 
 import sys

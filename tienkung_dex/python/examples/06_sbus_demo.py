@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""09 SBUS 遥控器（vendor demo 09 对应：Joy 摇杆轴 + A-F 按键事件）。
+"""06 SBUS 遥控器（Joy 摇杆轴 + A-F 按键事件）。
 
 mock:  inject 一条 SbusReading（axes + buttons）。
 real:  spin 5 秒订阅 /sbus_data 与 /sbus_data/event。
 
 用法:
-    python3 examples/09_sbus_demo.py
-    python3 examples/09_sbus_demo.py --backend real
+    python3 examples/06_sbus_demo.py
+    python3 examples/06_sbus_demo.py --backend real
 """
 
 import sys

@@ -99,7 +99,7 @@ def force_msg():
 
 def power_msgs():
     """(PowerBatteryStatus, PowerStatus, PowerBoardKeyStatus) tuple from
-    bodyctrl_msgs (vendor demo 08); (None, ...) + error when missing."""
+    bodyctrl_msgs; (None, ...) + error when missing."""
     battery, e1 = _resolve_msg('bodyctrl_msgs', 'PowerBatteryStatus')
     board, e2 = _resolve_msg('bodyctrl_msgs', 'PowerStatus')
     key, e3 = _resolve_msg('bodyctrl_msgs', 'PowerBoardKeyStatus')
@@ -127,7 +127,7 @@ def serial_service():
 
 def inspire_hand_msgs():
     """(SetAngle, SetForce, SetSpeed, GetAngleAct, GetForceAct, TouchData)
-    from inspire_hand_msgs (vendor demos 07/15); TouchData is optional."""
+    from inspire_hand_msgs; TouchData is optional."""
     names = ('SetAngle', 'SetForce', 'SetSpeed',
              'GetAngleAct', 'GetForceAct', 'TouchData')
     try:
@@ -144,7 +144,7 @@ def inspire_hand_msgs():
 
 
 def clear_error_service():
-    """SetClearError service (vendor demo 07, bodyctrl_msgs)."""
+    """SetClearError service (bodyctrl_msgs)."""
     try:
         module = importlib.import_module('bodyctrl_msgs.srv')
     except Exception as exc:

@@ -20,25 +20,26 @@ from tienkung_dex import TienkungDex
 
 # module -> demo class（与 examples/README.md 的列表一一对应）
 MODULES = {
-    '01_robot_state': 'RobotStateDemo',
-    '02_imu_demo': 'ImuDemo',
-    '03_head_control_demo': 'HeadControlDemo',
-    '04_arm_control_demo': 'ArmControlDemo',
-    '05_waist_control_demo': 'WaistControlDemo',
-    '06_leg_control_demo': 'LegControlDemo',
-    '07_hand_control_demo': 'HandControlDemo',
-    '08_power_status_demo': 'PowerStatusDemo',
-    '09_sbus_demo': 'SbusDemo',
-    '10_lidar_demo': 'LidarDemo',
-    '11_audio_ai_demo': 'AudioAiDemo',
-    '12_camera_demo': 'CameraDemo',
-    '13_gps_demo': 'GpsDemo',
-    '14_light_demo': 'LightDemo',
-    '15_hand_state_demo': 'HandStateDemo',
-    '16_serial_number_demo': 'SerialNumberDemo',
-    '17_safety_demo': 'SafetyDemo',
-    '18_audio_record_demo': 'AudioRecordDemo',
-    '19_joint_modes_demo': 'JointModesDemo',
+    '01_serial_number_demo': 'SerialNumberDemo',
+    '02_power_status_demo': 'PowerStatusDemo',
+    '03_robot_state': 'RobotStateDemo',
+    '04_imu_demo': 'ImuDemo',
+    '05_safety_demo': 'SafetyDemo',
+    '06_sbus_demo': 'SbusDemo',
+    '07_lidar_demo': 'LidarDemo',
+    '08_gps_demo': 'GpsDemo',
+    '09_camera_demo': 'CameraDemo',
+    '10_audio_ai_demo': 'AudioAiDemo',
+    '11_audio_record_demo': 'AudioRecordDemo',
+    '12_hand_state_demo': 'HandStateDemo',
+    '13_light_demo': 'LightDemo',
+    '14_hand_brainco_demo': 'BraincoHandDemo',
+    '15_hand_inspire_demo': 'InspireHandDemo',
+    '16_head_control_demo': 'HeadControlDemo',
+    '17_waist_control_demo': 'WaistControlDemo',
+    '18_arm_control_demo': 'ArmControlDemo',
+    '19_leg_control_demo': 'LegControlDemo',
+    '20_joint_modes_demo': 'JointModesDemo',
 }
 
 
@@ -67,7 +68,7 @@ def test_demo_runs_green_on_mock(module_name, capsys):
 
 
 def test_joint_modes_demo_refuses_real():
-    mod = importlib.import_module('examples.19_joint_modes_demo')
+    mod = importlib.import_module('examples.20_joint_modes_demo')
     with pytest.raises(SystemExit) as exc:
         mod.JointModesDemo(backend='real')
     assert exc.value.code == 2

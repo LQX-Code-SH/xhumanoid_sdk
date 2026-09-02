@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""14 灯带控制（vendor demo 14 对应：xsys 灯光指令）。
+"""13 灯带控制（xsys 灯光指令）。
 
 mock:  set_mode/set_cmd 并核对 MockLightControl.commands 记录。
 real:  发布灯带指令（观察机器人头部/胸部灯带变化），check is_active。
 
 用法:
-    python3 examples/14_light_demo.py
-    python3 examples/14_light_demo.py --mode wakeup --cmd 301
-    python3 examples/14_light_demo.py --backend real --mode listening
+    python3 examples/13_light_demo.py
+    python3 examples/13_light_demo.py --mode wakeup --cmd 301
+    python3 examples/13_light_demo.py --backend real --mode listening
 """
 
 import sys

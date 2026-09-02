@@ -77,6 +77,20 @@ def test_zero_calib_mode_locked(robot):
     robot.arm.command([JointCommand(joint_id=21)], ControlMode.ZERO_CALIB)
 
 
+def test_mock_publish_command_refreshes_liveness():
+    # The real /robot_state echo follows a command within the staleness
+    # window; the mock model must mirror that (regression: is_active used
+    # to go stale after a command that never stepped).
+    from tienkung_dex.backends.mock import MockJointGroup
+    joint = MockJointGroup(None, 'arm')
+    joint.start()
+    joint._last_seen = time.monotonic() - 10.0      # age out construction
+    assert not joint.is_active
+    joint.move_to({21: 0.0})
+    assert joint.is_active
+    joint.shutdown()
+
+
 def test_step_integration_and_wait_until(robot):
     robot.arm.set_position(21, 0.0)   # establish a position history first
     robot.arm.command([JointCommand(joint_id=21, pos=1.0, spd=0.5)])

@@ -67,7 +67,7 @@ HAND_TOPICS = {
 # --- safety ---------------------------------------------------------------
 KEY_STATUS_TOPIC = '/power/board/key_status'
 
-# --- power / light / sbus / serial (vendor demos 08/14/09/16) -------------
+# --- power / light / sbus / serial -------------
 POWER_TOPICS = {
     'battery': '/power/battery/status',
     'board': '/power/board/status',
@@ -93,7 +93,7 @@ SBUS_EVENT_TOPIC = '/sbus_data/event'       # bodyctrl_msgs/SbusData
 
 SERIAL_SERVICE = '/xsys/get_serial_number'
 
-# --- inspire (13-joint) hand (vendor demos 07/15) -------------------------
+# --- inspire (13-joint) hand -------------------------
 # Feedback topics are demo-15-confirmed; clear_error service from demo 07.
 INSPIRE_HAND_TOPICS = {
     'left': {

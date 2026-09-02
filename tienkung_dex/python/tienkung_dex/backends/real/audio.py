@@ -21,13 +21,9 @@ from tienkung_dex.core.types import AudioChunk
 
 from . import _msgs
 
-EVENT_TYPE_NAMES = {
-    1: 'asr_result',
-    4: 'keyword_wake',
-    5: 'exit_dialogue',
-    6: 'vad',
-    20: 'face_wake',
-}
+# Event-type names live in core (shared with mock); re-exported here for
+# existing importers.
+from tienkung_dex.core.presets import EVENT_TYPE_NAMES  # noqa: E402
 
 
 def parse_voice_activity(content: str) -> Optional[dict]:
@@ -213,6 +209,11 @@ class RealAudioSystem(AudioSystemBase):
     # -- recording --------------------------------------------------------
     def start_recording(self) -> bool:
         if self._ctrl_client is None or self._ctrl_cls is None:
+            return False
+        if not self._ctrl_client.wait_for_service(timeout_sec=1.0):
+            if self._log is not None:
+                self._log.error('audio: AudioControl service not reachable; '
+                                'recording not started')
             return False
         request = self._ctrl_cls.Request()
         request.enable = True

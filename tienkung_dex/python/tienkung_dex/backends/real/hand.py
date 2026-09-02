@@ -18,14 +18,9 @@ from tienkung_dex.core.types import HandStatus, TouchReading
 
 from . import _msgs
 
-# Gesture preset table copied from the gesture demo (motor order:
-# thumb flex, thumb rotate, index, middle, ring, pinky).
-GESTURE_POSITIONS = {
-    'ok': (450, 800, 450, 1, 1, 1),
-    'rock': (1000, 700, 1000, 1000, 1000, 1000),
-    'scissors': (1000, 500, 1, 1, 1000, 1000),
-    'paper': (1, 500, 1, 1, 1, 1),
-}
+# Gesture preset table lives in core (shared with sim/mock); re-exported
+# here for existing importers.
+from tienkung_dex.core.presets import GESTURE_POSITIONS  # noqa: E402
 
 MOTOR_COUNT = 6
 POS_MIN, POS_MAX = 1, 1000
@@ -42,8 +37,10 @@ class RealDexterousHand(DexterousHandBase):
         self._control_mode = control_mode
         self._pub = None
         self._sub = None
+        self._touch_sub = None
         self._msg_cls = None
         self._status_cls = None
+        self._touch_cls = None
         self._status = None
         self._touch_cbs: list[Callable[[TouchReading], None]] = []
 
@@ -77,6 +74,7 @@ class RealDexterousHand(DexterousHandBase):
     def on_stop(self) -> None:
         self._pub = None
         self._sub = None
+        self._touch_sub = None
         self._status = None
 
     @property
@@ -143,7 +141,12 @@ class RealDexterousHand(DexterousHandBase):
                            'brainco demo interface (ignored)')
 
     def set_speed(self, speeds: Sequence[int]) -> None:
-        self._publish((POS_MIN,) * MOTOR_COUNT, speeds=speeds)
+        # Brainco demo controls position only; speed setpoints are not
+        # demonstrated - accept and ignore with a warning (publishing
+        # POS_MIN positions alongside would physically straighten the hand).
+        if self._log is not None:
+            self._log.warn(f'{self.name}: set_speed not supported by the '
+                           'brainco demo interface (ignored)')
 
     def get_status(self) -> Optional[HandStatus]:
         return self._status
@@ -156,7 +159,7 @@ INSPIRE_JOINT_COUNT = 13
 
 
 class RealInspireHand(DexterousHandBase):
-    """Inspire 13-joint hand (vendor demos 07/15): angle/force/speed_set
+    """Inspire 13-joint hand: angle/force/speed_set
     commands, angle_actual/force_actual/touch_data feedback and the
     SetClearError service. joint_values are broadcast to all 13 joints
     like the demo does."""
@@ -167,6 +170,8 @@ class RealInspireHand(DexterousHandBase):
         self._log = logger
         self._pubs = {}          # 'angle' | 'force' | 'speed' -> publisher
         self._msg_cls = {}       # same keys -> message classes
+        self._sub_angle = None
+        self._sub_touch = None
         self._status = None
         self._clear_cli = None
         self._clear_srv_cls = None
@@ -211,6 +216,8 @@ class RealInspireHand(DexterousHandBase):
 
     def on_stop(self) -> None:
         self._pubs = {}
+        self._sub_angle = None
+        self._sub_touch = None
         self._status = None
 
     @property

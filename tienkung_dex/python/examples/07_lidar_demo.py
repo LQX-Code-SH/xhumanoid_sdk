@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""10 激光雷达点云（vendor demo 10 对应：livox PointCloud2 透传）。
+"""07 激光雷达点云（livox PointCloud2 透传）。
 
 mock:  inject 一个占位对象，验证回调与 latest()。
 real:  spin 5 秒订阅 /livox/lidar。
 
 用法:
-    python3 examples/10_lidar_demo.py
-    python3 examples/10_lidar_demo.py --backend real
+    python3 examples/07_lidar_demo.py
+    python3 examples/07_lidar_demo.py --backend real
 """
 
 import sys

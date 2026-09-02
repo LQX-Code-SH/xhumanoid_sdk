@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Real light-strip control over /xsys/light/ctrl (vendor demo 14).
+"""Real light-strip control over /xsys/light/ctrl .
 
 LightCtrl fields (demo-confirmed): cmd (preset id), data (payload),
 caller_id, caller_msg. Presets live in core.topics.LIGHT_CMDS.

@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""19 关节控制模式全集（项目特有：ControlMode 0-5 + ZERO_CALIB 解锁）。
+"""20 关节控制模式全集（项目特有：ControlMode 0-5 + ZERO_CALIB 解锁）。
 
 仅 mock：逐个模式发送低层 command()，验证 ZERO_CALIB 默认锁定、
 unlock_calibration_mode() 后放行。真机上这些模式直接下发有硬件风险，
-故拒绝 --backend real（真机模式测试请用 03~06 的 move_to/impedance）。
+故拒绝 --backend real（真机模式测试请用 16~19 的 move_to/impedance）。
 
 用法:
-    python3 examples/19_joint_modes_demo.py
+    python3 examples/20_joint_modes_demo.py
 """
 
 import sys
@@ -23,7 +23,7 @@ class JointModesDemo(DemoBase):
     def __init__(self, backend='mock'):
         if backend != 'mock':
             print('本 demo 仅支持 mock 后端：低层模式直接下发对真机有'
-                  '硬件风险（真机请用 03~06 的 move_to/impedance）。')
+                  '硬件风险（真机请用 16~19 的 move_to/impedance）。')
             sys.exit(2)
         super().__init__(backend, enable={'joint'})
 

@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""12 相机图像（vendor demo 12 对应：4 路 RGB-D + 可选 6 路全景）。
+"""09 相机图像（4 路 RGB-D + 可选 6 路全景）。
 
 mock:  对每路相机 publish_frame ×2，验证 latest() / frame_rate()。
 real:  spin 5 秒统计各路帧数；--panorama 附加 6 路全景相机。
 
 用法:
-    python3 examples/12_camera_demo.py
-    python3 examples/12_camera_demo.py --panorama
-    python3 examples/12_camera_demo.py --backend real --panorama
+    python3 examples/09_camera_demo.py
+    python3 examples/09_camera_demo.py --panorama
+    python3 examples/09_camera_demo.py --backend real --panorama
 """
 
 import sys

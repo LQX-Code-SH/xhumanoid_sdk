@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""18 语音录制（项目特有：start/stop_recording + AudioRingBuffer 快照）。
+"""11 语音录制（项目特有：start/stop_recording + AudioRingBuffer 快照）。
 
 mock:  注入 3 个合成音频块，验证录制时长合计。
 real:  录制 --seconds 秒后停止；--out 用 stdlib wave 写 16-bit PCM 单声道。
 
 用法:
-    python3 examples/18_audio_record_demo.py
-    python3 examples/18_audio_record_demo.py --out /tmp/record.wav
-    python3 examples/18_audio_record_demo.py --backend real --seconds 5 --out /tmp/record.wav
+    python3 examples/11_audio_record_demo.py
+    python3 examples/11_audio_record_demo.py --out /tmp/record.wav
+    python3 examples/11_audio_record_demo.py --backend real --seconds 5 --out /tmp/record.wav
 """
 
 import sys

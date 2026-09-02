@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""17 急停安全链路（项目特有：EstopActiveError 拦截 + 边沿回调）。
+"""05 急停安全链路（项目特有：EstopActiveError 拦截 + 边沿回调）。
 
 mock:  注入急停 → 验证拦截关节指令（L1 冗余层）→ 解除后恢复。
 real:  纯观测模式——只监听急停边沿事件 8 秒，不发任何关节指令
        （真机上请按/松机器人急停按钮观察输出）。
 
 用法:
-    python3 examples/17_safety_demo.py
-    python3 examples/17_safety_demo.py --backend real
+    python3 examples/05_safety_demo.py
+    python3 examples/05_safety_demo.py --backend real
 """
 
 import sys

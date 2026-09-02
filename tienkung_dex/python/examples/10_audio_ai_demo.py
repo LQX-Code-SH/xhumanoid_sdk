@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""11 语音交互（vendor demo 11 对应：TTS speak / play_file / 语音事件）。
+"""10 语音交互（TTS speak / play_file / 语音事件）。
 
 mock:  speak 验证返回值；inject_voice_event 验证 ASR 回调。
 real:  speak 后 spin 5 秒观察真实语音事件（对着机器人说话）。
 
 用法:
-    python3 examples/11_audio_ai_demo.py
-    python3 examples/11_audio_ai_demo.py --backend real --play-file /tmp/a.wav
+    python3 examples/10_audio_ai_demo.py
+    python3 examples/10_audio_ai_demo.py --backend real --play-file /tmp/a.wav
 """
 
 import sys

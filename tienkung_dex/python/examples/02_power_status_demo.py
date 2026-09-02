@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""08 电源状态（vendor demo 08 对应：电压/电流/功率/急停键）。
+"""02 电源状态（电压/电流/功率/急停键）。
 
 mock:  inject 一条 PowerReading，验证回调与 latest()。
 real:  spin 5 秒订阅 /power/battery|board/status。
 
 用法:
-    python3 examples/08_power_status_demo.py
-    python3 examples/08_power_status_demo.py --backend real
+    python3 examples/02_power_status_demo.py
+    python3 examples/02_power_status_demo.py --backend real
 """
 
 import sys

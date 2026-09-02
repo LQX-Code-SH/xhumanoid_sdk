@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""03 头部关节控制（vendor demo 03 对应：pos / imp 两种模式 + 回零）。
+"""16 头部关节控制（pos / imp 两种模式 + 回零）。
 
 用法:
-    python3 examples/03_head_control_demo.py --mode pos      # mock/real 通用
-    python3 examples/03_head_control_demo.py --backend real --mode imp
+    python3 examples/16_head_control_demo.py --mode pos      # mock/real 通用
+    python3 examples/16_head_control_demo.py --backend real --mode imp
 """
 
 import sys

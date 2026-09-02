@@ -17,7 +17,7 @@ from .hand import RealDexterousHand, RealInspireHand
 from .joint import RealJointGroup, RobotStateCache
 from .light import RealLightControl
 from .power import RealPowerSystem
-from .safety import NullSafetyMonitor, RealSafetyMonitor
+from .safety import RealSafetyMonitor
 from .sbus import RealSbusStream
 from .sensors import ForceStream, GpsStream, ImuStream, LidarStream
 from .serial import RealSerialNumber
@@ -160,9 +160,10 @@ class RealBackendFactory:
                             topics=self._hand_topics[side], logger=self._log)
                     subsystems[f'hand_{side}'] = hand
             except Exception as exc:
-                self._log.error(
-                    f'hand ({self._hand_vendor}): vendor message package '
-                    f'unavailable ({exc}); hands left as None')
+                if self._log is not None:
+                    self._log.error(
+                        f'hand ({self._hand_vendor}): vendor message package '
+                        f'unavailable ({exc}); hands left as None')
 
         # Audio (interaction_msgs + lyre_msgs; degrades to speak()=False).
         if self._wanted(OPTIONAL_AUDIO):

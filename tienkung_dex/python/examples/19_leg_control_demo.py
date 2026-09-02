@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""06 腿部关节控制（vendor demo 06 对应）。
+"""19 腿部关节控制。
 
 ⚠️  真机运行前必须将机器人固定在安全支架上——腿部失稳会直接摔倒。
     仅下发小角度目标并自动回零。
 
 用法:
-    python3 examples/06_leg_control_demo.py                   # mock
-    python3 examples/06_leg_control_demo.py --backend real    # 真机（需支架）
+    python3 examples/19_leg_control_demo.py                   # mock
+    python3 examples/19_leg_control_demo.py --backend real    # 真机（需支架）
 """
 
 import sys

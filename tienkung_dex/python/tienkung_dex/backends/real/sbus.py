@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Real RC SBUS receiver (vendor demo 09): Joy axes + SbusData buttons.
+"""Real RC SBUS receiver : Joy axes + SbusData buttons.
 
 The joystick path (/sbus_data, sensor_msgs/Joy) is standard and always
 available; the button event path (/sbus_data/event, bodyctrl_msgs/SbusData)
@@ -59,13 +59,20 @@ class RealSbusStream(SbusStreamBase):
     def _on_joy(self, msg) -> None:
         self._axes = tuple(float(a) for a in (msg.axes or ()))
         self._last_seen = time.monotonic()
-        self._emit(self.latest())
+        reading = self.latest()
+        if reading is not None:
+            self._emit(reading)
 
     def _on_event(self, msg) -> None:
         self._buttons = tuple(int(getattr(msg, field, 0)) for field in
                               ('button_a', 'button_b', 'button_c',
                                'button_d', 'button_e', 'button_f'))
-        self._emit(self.latest())
+        # A button event proves the receiver is alive even before the first
+        # Joy message (and keeps is_active fresh on event-only streams).
+        self._last_seen = time.monotonic()
+        reading = self.latest()
+        if reading is not None:
+            self._emit(reading)
 
     def latest(self) -> Optional[SbusReading]:
         if self._last_seen is None:

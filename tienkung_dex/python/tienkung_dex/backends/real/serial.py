@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Robot serial number over /xsys/get_serial_number (vendor demo 16).
+"""Robot serial number over /xsys/get_serial_number .
 
 GetSerialNumber.Request is empty; the response carries serial_number.
 Degrades like the optional services: get_serial_number() returns None on

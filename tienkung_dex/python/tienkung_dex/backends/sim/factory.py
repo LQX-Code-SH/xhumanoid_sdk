@@ -23,6 +23,11 @@ from .joint import SimJointGroup
 class SimBackendFactory:
     """Builds the Gazebo-compatible subsystem set (same API as real)."""
 
+    # What this factory can actually build; anything else in `enable` has no
+    # simulation equivalent and would silently leave facade attrs as None.
+    SUPPORTED = frozenset({'joint', 'camera', 'panorama', 'hand', 'audio',
+                           'safety', 'imu', 'lidar'})
+
     def __init__(self, node, logger, joints_table,
                  enable: set[str] | None = None,
                  hand_vendor: str = 'brainco',
@@ -51,6 +56,12 @@ class SimBackendFactory:
         self._lidar_topic = params.get('lidar_topic', t.LIDAR_TOPIC)
         self._pair_window = params.get('camera.pair_window', 0.05)
         self._state_timeout = params.get('state.stale_timeout', 0.5)
+
+        unsupported = self._enable - self.SUPPORTED if self._enable else set()
+        if unsupported and self._log is not None:
+            self._log.warn(
+                f'sim backend has no simulation for {sorted(unsupported)}; '
+                'the corresponding facade attributes stay None')
 
     def _wanted(self, key: str) -> bool:
         return self._enable is None or key in self._enable

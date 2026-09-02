@@ -8,6 +8,8 @@ class name is not pinned by any demo and is probed by _msgs.key_status_msg().
 
 from __future__ import annotations
 
+import time
+
 from typing import Optional
 
 from tienkung_dex.core.base import SafetyMonitorBase
@@ -31,7 +33,15 @@ def _bool_field(msg, name: str, default: bool = False) -> bool:
 
 
 class RealSafetyMonitor(SafetyMonitorBase):
-    """Subscribes key_status; edge-triggered on_estop callbacks."""
+    """Subscribes key_status; edge-triggered on_estop callbacks.
+
+    is_active follows the same staleness semantics as every other data
+    stream (measured /power/board/key_status rate on the real host:
+    ~12.6 Hz, so the default 0.5 s window has >6 message periods of
+    margin): False before the first message and once the stream goes
+    silent, so health() flags a dead e-stop source instead of reporting
+    green forever.
+    """
 
     def __init__(self, node, topic: str, logger, stale_timeout: float = 0.5):
         super().__init__(node)
@@ -61,14 +71,14 @@ class RealSafetyMonitor(SafetyMonitorBase):
 
     @property
     def is_active(self) -> bool:
-        return self._sub is not None
+        return (self._last_seen is not None
+                and time.monotonic() - self._last_seen < self._stale_timeout)
 
     def _on_key_status(self, msg) -> None:
         estop = _bool_field(msg, 'is_estop')
         remote = _bool_field(msg, 'is_remote_estop')
         combined = estop or remote
         previous = self._estopped or self._remote
-        import time
         self._estopped = estop
         self._remote = remote
         self._last_seen = time.monotonic()
@@ -88,34 +98,3 @@ class RealSafetyMonitor(SafetyMonitorBase):
         if self._sub is not None and self.is_estopped:
             raise EstopActiveError(
                 'robot e-stop active: joint commands rejected (L1)')
-
-
-class NullSafetyMonitor(SafetyMonitorBase):
-    """Degraded fallback: no key_status message available, interception off.
-
-    Keeps the L1 semantics visible: is_estopped stays False but is_active
-    reports False, so the health() summary flags the degradation.
-    """
-
-    def __init__(self, node, logger, reason: str):
-        super().__init__(node)
-        self._log = logger
-        self._reason = reason
-
-    def on_start(self) -> None:
-        if self._log is not None:
-            self._log.error(f'safety: {self._reason}')
-
-    def on_stop(self) -> None:
-        pass
-
-    @property
-    def is_active(self) -> bool:
-        return False
-
-    @property
-    def is_estopped(self) -> bool:
-        return False
-
-    def guard(self) -> None:
-        pass

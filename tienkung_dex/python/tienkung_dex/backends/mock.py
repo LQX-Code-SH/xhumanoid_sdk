@@ -94,6 +94,9 @@ class MockJointGroup(JointGroupBase):
                 # robot knows where it is). Integration only happens once a
                 # position history exists (set_position / previous step).
                 self._positions[cmd.joint_id] = float(cmd.pos)
+        # A command also refreshes liveness: the real path's /robot_state
+        # echo follows the command within the staleness window.
+        self._last_seen = time.monotonic()
         # Mock convenience: a command produces a state snapshot for
         # observers immediately (the real path is the async /robot_state).
         self._emit(self.get_states())
@@ -309,7 +312,7 @@ class MockAudioSystem(AudioSystemBase):
     def inject_voice_event(self, event_type: int, text: str = '',
                            trace_id: str = 'mock', **extra) -> None:
         """Injection: a structured ASR event through the observer path."""
-        from tienkung_dex.backends.real.audio import EVENT_TYPE_NAMES
+        from tienkung_dex.core.presets import EVENT_TYPE_NAMES
         event = {'event_type': event_type,
                  'name': EVENT_TYPE_NAMES.get(event_type, f'unknown({event_type})'),
                  'text': text, 'angle': -1, 'trace_id': trace_id,
@@ -348,7 +351,7 @@ class MockDexterousHand(DexterousHandBase):
         self._positions = tuple(int(p) for p in positions[:6])
 
     def set_gesture(self, gesture: str) -> bool:
-        from .real.hand import GESTURE_POSITIONS
+        from tienkung_dex.core.presets import GESTURE_POSITIONS
         preset = GESTURE_POSITIONS.get(gesture)
         if preset is None:
             return False

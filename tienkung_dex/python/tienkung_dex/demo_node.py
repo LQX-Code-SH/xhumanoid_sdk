@@ -9,7 +9,7 @@ which reproduces each SDK demo's observable behaviour through one facade.
 Periodic mode (default):
     ros2 run tienkung_dex tienkung_dex_demo
 
-One-shot self-check mode (vendor-style terminal report; the exit code is
+One-shot self-check mode (terminal report; the exit code is
 the number of inactive subsystems, so 0 = all healthy - CI friendly):
     ros2 run tienkung_dex tienkung_dex_demo --ros-args \
         -p backend:=real -p once:=True -p once_duration:=8.0
@@ -71,7 +71,7 @@ class DemoNode(Node):
         self.get_logger().info(self.robot.report())
 
     def final_report(self):
-        """One-shot terminal report (vendor demo style) with exit code =
+        """One-shot terminal report with exit code =
         number of inactive subsystems."""
         health = self.robot.health()
         failures = 0
@@ -88,7 +88,9 @@ class DemoNode(Node):
         print(f'  总计 {len(health)} 项: '
               f'{len(health) - failures} 正常 / {failures} 异常')
         print('============================================')
-        self._exit_code = failures
+        # sys.exit() semantics truncate above 255 - clamp so shell callers
+        # can distinguish "some failures" (>=1) from hard errors.
+        self._exit_code = min(failures, 255)
         self.robot.shutdown()
         rclpy.shutdown()
 

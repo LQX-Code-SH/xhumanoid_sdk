@@ -30,6 +30,17 @@ def _getattr_or(msg, name: str, default):
         return default
 
 
+def _joint_id(item) -> Optional[int]:
+    """status[].name holds the SDK joint ID (demo-confirmed); tolerate
+    non-numeric names from SDK drift by skipping that entry instead of
+    raising inside the subscription callback."""
+    raw = _getattr_or(item, 'name', None)
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return None
+
+
 def parse_robot_state(msg) -> dict:
     """Pure conversion RobotState -> {group: {joint_id: JointReading}}.
 
@@ -44,7 +55,9 @@ def parse_robot_state(msg) -> dict:
         readings = {}
         if statuses is not None:
             for item in statuses:
-                jid = int(_getattr_or(item, 'name', 0))
+                jid = _joint_id(item)
+                if jid is None:
+                    continue
                 reading = JointReading(
                     joint_id=jid,
                     pos=float(_getattr_or(item, 'pos', 0.0)),
@@ -88,6 +101,14 @@ class RobotStateCache:
                 self._log.error(f'RobotStateCache: subscribe failed: {exc}')
             return False
         return True
+
+    def shutdown(self) -> None:
+        self._sub = None
+
+    @property
+    def topic(self) -> str:
+        """Subscribed topic name (for logging by consumers)."""
+        return self._topic
 
     def _on_robot_state(self, msg) -> None:
         groups = parse_robot_state(msg)
@@ -138,10 +159,6 @@ class RealJointGroup(JointGroupBase):
         self._msg_cls, err = _msgs.joint_cmd_msg(self.group)
         if self._msg_cls is None:
             raise RuntimeError(f'{self.name}: {err}')
-        if self.group != 'arm' and err == '' and not hasattr(
-                self._msg_cls, 'ctrl'):
-            # Fallback ArmCtrl already happened inside joint_cmd_msg.
-            pass
         if self._msg_cls.__name__ == 'ArmCtrl' and self.group != 'arm':
             if self._log is not None and not self._msg_cls_fallback_warned:
                 self._log.warn(
@@ -154,7 +171,7 @@ class RealJointGroup(JointGroupBase):
         if self._log is not None:
             self._log.info(
                 f'{self.name}: pub {self._cmd_topic} ({self._msg_cls.__name__}), '
-                f'sub {self._state_cache._topic} (shared)')
+                f'sub {self._state_cache.topic} (shared)')
 
     def on_stop(self) -> None:
         self._pub = None

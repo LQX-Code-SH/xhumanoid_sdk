@@ -58,7 +58,7 @@ class TienkungDex:
         self.gps = _take('gps')
         self.force = _take('force')
 
-        # Power / light / RC / robot identity (vendor demos 08/14/09/16).
+        # Power / light / RC / robot identity
         self.power = _take('power')
         self.light = _take('light')
         self.sbus = _take('sbus')
@@ -82,6 +82,14 @@ class TienkungDex:
             except Exception as exc:  # pragma: no cover - defensive
                 if self._log is not None:
                     self._log.warn(f'shutdown {subsystem.name}: {exc}')
+        # state_cache is not a facade subsystem (kept out of health()) but
+        # owns the shared /robot_state subscription - release it too.
+        if self.state_cache is not None:
+            try:
+                self.state_cache.shutdown()
+            except Exception as exc:  # pragma: no cover - defensive
+                if self._log is not None:
+                    self._log.warn(f'shutdown state_cache: {exc}')
 
     def health(self) -> dict[str, bool]:
         """{subsystem_name: is_active} summary for bringup self-checks."""

@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""16 序列号查询（vendor demo 16 对应：/xsys/get_serial_number 服务）。
+"""01 序列号查询（/xsys/get_serial_number 服务）。
 
 mock:  返回固定 'MOCK-SN-0000'。
 real:  调用服务返回机器人序列号。
 
 用法:
-    python3 examples/16_serial_number_demo.py
-    python3 examples/16_serial_number_demo.py --backend real
+    python3 examples/01_serial_number_demo.py
+    python3 examples/01_serial_number_demo.py --backend real
 """
 
 import sys

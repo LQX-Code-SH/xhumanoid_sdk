@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""04 手臂关节控制（vendor demo 04 对应：左/右臂 + 回零 homing）。
+"""18 手臂关节控制（左/右臂 + 回零 homing）。
 
 用法:
-    python3 examples/04_arm_control_demo.py --mode imp        # mock
-    python3 examples/04_arm_control_demo.py --backend real    # 真机
+    python3 examples/18_arm_control_demo.py --mode imp        # mock
+    python3 examples/18_arm_control_demo.py --backend real    # 真机
 """
 
 import sys

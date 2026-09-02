@@ -171,7 +171,7 @@ class WrenchReading:
 
 @dataclass(frozen=True)
 class PowerReading:
-    """Power snapshot from /power/battery|board/status (vendor demo 08).
+    """Power snapshot from /power/battery|board/status .
 
     Battery fields are the master-battery values the demo prints
     (voltage/current/power); key fields come from /power/board/key_status
@@ -188,7 +188,7 @@ class PowerReading:
 
 @dataclass(frozen=True)
 class SbusReading:
-    """RC transmitter snapshot (vendor demo 09): joy axes + button events.
+    """RC transmitter snapshot : joy axes + button events.
 
     axes follows sensor_msgs/Joy (/sbus_data); buttons holds the raw
     button_a..button_f fields of bodyctrl_msgs/SbusData (/sbus_data/event)

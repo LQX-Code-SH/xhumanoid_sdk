@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""02 IMU 姿态订阅（vendor demo 02 对应，支持 xsens / livox 双源）。
+"""04 IMU 姿态订阅（支持 xsens / livox 双源）。
 
 mock:  inject 一条 ImuReading，验证 latest() / on_reading。
 real:  imu_source 选择数据源，spin 5 秒计帧。
 
 用法:
-    python3 examples/02_imu_demo.py                             # mock
-    python3 examples/02_imu_demo.py --backend real --source xsens
-    python3 examples/02_imu_demo.py --backend real --source livox
+    python3 examples/04_imu_demo.py                             # mock
+    python3 examples/04_imu_demo.py --backend real --source xsens
+    python3 examples/04_imu_demo.py --backend real --source livox
 """
 
 import sys

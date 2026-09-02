@@ -63,15 +63,11 @@ class SimDexterousHand(DexterousHandBase):
         self._notify_touch()
 
     def set_gesture(self, gesture: str) -> bool:
-        presets = {
-            'ok': (450, 800, 450, 1, 1, 1),
-            'rock': (1000, 700, 1000, 1000, 1000, 1000),
-            'scissors': (1000, 500, 1, 1, 1000, 1000),
-            'paper': (1, 500, 1, 1, 1, 1),
-        }
-        if gesture not in presets:
+        from tienkung_dex.core.presets import GESTURE_POSITIONS
+        preset = GESTURE_POSITIONS.get(gesture)
+        if preset is None:
             return False
-        self.set_positions(presets[gesture])
+        self.set_positions(preset)
         return True
 
     def set_force(self, forces: Sequence[int]) -> None:
