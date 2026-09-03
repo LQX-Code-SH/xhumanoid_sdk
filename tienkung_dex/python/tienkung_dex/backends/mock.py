@@ -21,7 +21,8 @@ from tienkung_dex.core.base import (AudioSystemBase, CameraStreamBase,
                                     JointGroupBase, LidarStreamBase,
                                     LightControlBase, MultiCameraGroupBase,
                                     PowerSystemBase, SafetyMonitorBase,
-                                    SbusStreamBase, SerialNumberBase)
+                                    SbusStreamBase, SerialNumberBase,
+                                    VectorWalkBase)
 from tienkung_dex.core.ring import AudioRingBuffer
 from tienkung_dex.core.types import (AudioChunk, CameraFrame, ControlMode,
                                      GpsFixReading, HandStatus, ImuReading,
@@ -165,6 +166,71 @@ class MockSafetyMonitor(SafetyMonitorBase):
         if self.is_estopped:
             raise EstopActiveError(
                 'robot e-stop active: joint commands rejected (L1)')
+
+
+class MockVectorWalk(VectorWalkBase):
+    """Headless vector walk: records setpoints + a simple kinematic model.
+
+    node may be None - callers then drive step(dt) explicitly (no clock,
+    like MockJointGroup). With a node a 20 Hz timer advances the model
+    automatically. The model integrates the latest setpoint so headless
+    demos/tests can assert that a non-zero stream produced displacement and
+    that stop() froze it.
+    """
+
+    def __init__(self, node, logger=None):
+        super().__init__(node, 'walk', logger=logger)
+        self._x = 0.0
+        self._y = 0.0
+        self._yaw = 0.0
+        self._history: list = []
+        self._timer = None
+        self._ready = False
+
+    def on_start(self) -> None:
+        self._ready = True
+        if self._node is not None:
+            self._timer = self._node.create_timer(0.05, self._tick)
+
+    def on_stop(self) -> None:
+        self._timer = None
+        self._ready = False
+
+    @property
+    def is_active(self) -> bool:
+        return self._ready
+
+    @property
+    def pose_x(self) -> float:
+        return self._x
+
+    @property
+    def pose_y(self) -> float:
+        return self._y
+
+    @property
+    def pose_yaw(self) -> float:
+        return self._yaw
+
+    @property
+    def history(self) -> list:
+        """Every setpoint frame accepted by publish_command (newest last)."""
+        return list(self._history)
+
+    def _tick(self) -> None:
+        self.step(0.05)
+
+    def step(self, dt: float) -> None:
+        """Advance the kinematic model by dt seconds at the latest setpoint."""
+        vel = self._velocity
+        if vel.norm > 0.0:
+            self._x += vel.vx * dt
+            self._y += vel.vy * dt
+            self._yaw += vel.wz * dt
+
+    def publish_command(self, cmd) -> None:
+        self._history.append(cmd)
+        self._note_publish()
 
 
 class MockCameraStream(CameraStreamBase):
@@ -627,6 +693,11 @@ class MockBackendFactory:
                 joint = MockJointGroup(self._node, group, logger=self._log)
                 joint.attach_guard(safety.guard)
                 subsystems[f'joint_{group}'] = joint
+
+        if self._wanted('walk'):
+            walk = MockVectorWalk(self._node, logger=self._log)
+            walk.attach_guard(safety.guard)
+            subsystems['walk'] = walk
 
         if self._wanted('camera'):
             from tienkung_dex.core import topics as t

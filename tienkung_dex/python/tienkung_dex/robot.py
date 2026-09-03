@@ -58,6 +58,11 @@ class TienkungDex:
         self.gps = _take('gps')
         self.force = _take('force')
 
+        # Vector walking (HRIC cmd_vel): the legs are owned by the
+        # locomotion policy and must not be driven joint-wise; movement is
+        # requested as a body-frame velocity stream (see core/topics.py).
+        self.walk = _take('walk')
+
         # Power / light / RC / robot identity
         self.power = _take('power')
         self.light = _take('light')
@@ -147,7 +152,7 @@ def create_robot(node, backend: str = 'real', *,
               default: optional hardware)
     **topic_overrides : per-robot topic names overriding core/topics.py
     """
-    default_enable = {'joint', 'camera', 'hand', 'audio', 'safety',
+    default_enable = {'joint', 'walk', 'camera', 'hand', 'audio', 'safety',
                       'imu', 'lidar', 'gps', 'force', 'power', 'light',
                       'sbus', 'serial'}
     enable = set(enable) if enable is not None else set(default_enable)

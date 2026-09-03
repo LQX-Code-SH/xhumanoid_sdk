@@ -23,6 +23,7 @@ from typing import Optional
 
 import numpy as np
 
+from . import topics as t
 from .types import (
     AudioChunk,
     CameraFrame,
@@ -35,6 +36,7 @@ from .types import (
     PowerReading,
     SbusReading,
     TouchReading,
+    VelocityCommand,
     WrenchReading,
 )
 
@@ -364,6 +366,112 @@ class SafetyMonitorBase(SubsystemBase, _Observable):
         self.on(cb)
 
 
+class VectorWalkBase(SubsystemBase):
+    """Vector-velocity walking subsystem (矢量行走, HRIC cmd_vel).
+
+    Leg joints are owned by the locomotion policy (run_patrol / RL full-body
+    control) and must NOT be driven through the joint path; walking is only
+    requested as a robot-body-frame velocity stream on
+    /hric/robot/cmd_vel (geometry_msgs/TwistStamped). Reference:
+    具身天工DEX-矢量行走接口.md.
+
+    Command semantics:
+      - vx = forward (m/s), vy = lateral (m/s), wz = turn (rad/s); all other
+        Twist fields stay 0;
+      - the backend keeps re-publishing the latest setpoint at ~20 Hz
+        (streaming cadence the locomotion expects), so the robot keeps
+        walking until stop() re-publishes a zero setpoint;
+      - out-of-range setpoints are clamped to the WALK_LIMITS box;
+      - ||(vx, vy, wz)|| < stop_norm (0.05) is treated as standing and
+        sent as a full-zero stop setpoint.
+    The shared e-stop guard intercepts every setpoint change like the joint
+    groups (design doc §4.6); a running stream is force-zeroed on e-stop.
+    """
+
+    def __init__(self, node, name: str = 'walk', logger=None,
+                 limits: Mapping | None = None,
+                 stop_norm: float | None = None):
+        SubsystemBase.__init__(self, node, name)
+        self._log = logger
+        self._guard = None
+        self._limits = dict(limits if limits is not None else t.WALK_LIMITS)
+        self._stop_norm = t.WALK_STOP_NORM if stop_norm is None \
+            else float(stop_norm)
+        self._velocity = VelocityCommand()
+        self._published_count = 0
+
+    def attach_guard(self, guard) -> None:
+        """Install the e-stop guard invoked before every setpoint change."""
+        self._guard = guard
+
+    # -- command ----------------------------------------------------------
+    def set_velocity(self, vx: float = 0.0, vy: float = 0.0,
+                     wz: float = 0.0) -> None:
+        """Request one velocity setpoint (streamed by the backend until the
+        next request; zero/near-zero -> standing)."""
+        self._precheck()
+        cmd = self._sanitize(vx, vy, wz)
+        self._velocity = cmd
+        self.publish_command(cmd)
+
+    def stop(self) -> None:
+        """Request standing: re-publish a zero setpoint immediately."""
+        self.set_velocity(0.0, 0.0, 0.0)
+
+    def stand(self) -> None:
+        """Alias of stop(): request standing."""
+        self.stop()
+
+    # -- state ------------------------------------------------------------
+    @property
+    def velocity(self) -> VelocityCommand:
+        """Latest accepted setpoint (already clamped / zeroed)."""
+        return self._velocity
+
+    @property
+    def publish_count(self) -> int:
+        """Setpoint frames emitted so far (streaming cadence included)."""
+        return self._published_count
+
+    @property
+    def limits(self) -> dict:
+        """Active velocity clamp box (copy of the configured limits)."""
+        return dict(self._limits)
+
+    @property
+    def stop_norm(self) -> float:
+        """Setpoints with ||(vx, vy, wz)|| below this are sent as standing."""
+        return self._stop_norm
+
+    # -- internal ---------------------------------------------------------
+    def _precheck(self) -> None:
+        if self._guard is not None:
+            self._guard()
+
+    def _sanitize(self, vx: float, vy: float, wz: float) -> VelocityCommand:
+        lim = self._limits
+
+        def _clip(value: float, lo: float, hi: float) -> float:
+            value = float(value)
+            return max(lo, min(hi, value))
+
+        cmd = VelocityCommand(
+            vx=_clip(vx, lim['vx_min'], lim['vx_max']),
+            vy=_clip(vy, lim['vy_min'], lim['vy_max']),
+            wz=_clip(wz, lim['wz_min'], lim['wz_max']))
+        if cmd.norm < self._stop_norm:
+            return VelocityCommand()      # standing (full zero)
+        return cmd
+
+    def _note_publish(self) -> None:
+        self._published_count += 1
+
+    @abstractmethod
+    def publish_command(self, cmd: VelocityCommand) -> None:
+        """Backend hook invoked by set_velocity() after guards/clamping:
+        emit the setpoint now and (real) keep pumping it on the cadence."""
+
+
 class ImuStreamBase(SubsystemBase, _Observable):
     """Unified IMU stream (design doc §4.7)."""
 
@@ -502,6 +610,7 @@ __all__ = [
     'MultiCameraGroupBase',
     'AudioSystemBase',
     'SafetyMonitorBase',
+    'VectorWalkBase',
     'ImuStreamBase',
     'LidarStreamBase',
     'GpsStreamBase',

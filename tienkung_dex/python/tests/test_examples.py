@@ -40,7 +40,7 @@ MODULES = {
     '18_head_control_demo': 'HeadControlDemo',
     '19_waist_control_demo': 'WaistControlDemo',
     '20_arm_control_demo': 'ArmControlDemo',
-    '21_leg_control_demo': 'LegControlDemo',
+    '21_vector_walk_demo': 'VectorWalkDemo',
     '22_joint_modes_demo': 'JointModesDemo',
 }
 

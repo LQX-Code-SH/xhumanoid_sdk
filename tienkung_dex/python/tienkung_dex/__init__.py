@@ -36,6 +36,7 @@ from .core.types import (
     PowerReading,
     SbusReading,
     TouchReading,
+    VelocityCommand,
     WrenchReading,
 )
 from .robot import TienkungDex, create_robot
@@ -57,6 +58,7 @@ __all__ = [
     'WrenchReading',
     'PowerReading',
     'SbusReading',
+    'VelocityCommand',
     'RobotError',
     'BackendUnavailableError',
     'EstopActiveError',

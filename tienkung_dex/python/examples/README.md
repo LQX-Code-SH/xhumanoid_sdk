@@ -10,7 +10,7 @@
 - **`--backend mock`**：完全 headless 的内存桩，供无真机的开发机、单测/CI 与流程
   走通（所有自动回归都显式 `--backend mock`，与 CLI 默认解耦）；
 - **`--backend sim`**：ros_gz 仿真（推荐与 20/09 组合验证）。
-- **18~21（关节运动）默认 real 时**：先打印风险提示并要求**终端回车确认**才下发；
+- **18~20（关节运动）与 21（矢量行走）默认 real 时**：先打印风险提示并要求**终端回车确认**才下发；
   stdin 无 TTY（AI/脚本/CI 调用）一律拒绝并以退出码 2 终止——真机运动只能由人在
   终端确认触发。
 
@@ -20,7 +20,7 @@
 ## 列表（按功能区域分组，简易到难 = 真机测试先后顺序）
 
 序号即推荐的真机测试顺序：先纯观测确认各子系统在线，再验证感知与语音，
-然后从低风险执行机构到躯干关节，最后才是底层控制模式。
+然后从低风险执行机构到全身关节运动/矢量行走，最后才是底层控制模式。
 
 ### ① 基础状态观测（纯订阅/服务调用，零运动风险）
 
@@ -55,13 +55,13 @@
 | 17 | `17_hand_inspire_demo.py` | 因时 13 关节手：`set_positions`/`set_force`/`set_speed` + `clear_error` | `--side`、`--pos/--force/--speed`、`--clear-error` |
 | 18 | `18_head_control_demo.py` | 头部**大幅周期摆头/点头**（平滑插值；pos 用 spd/cur 直发保证肉眼可见）+ 回中 | `--mode pos\|imp`、`--amp-yaw`、`--amp-pitch`、`--freq`、`--cycles`、`--spd`、`--cur` |
 
-### ④ 躯干关节控制（运动幅度与风险递增，需先通过 ①②③）
+### ④ 全身关节/矢量行走控制（运动幅度与风险递增，需先通过 ①②③）
 
 | # | 脚本 | 测试接口 | 常用参数 |
 |---|------|----------|----------|
 | 19 | `19_waist_control_demo.py` | 腰部三轴（pitch→roll→yaw）插值小角度动作 + 回零 | `--mode pos\|imp`、`--ramp s`、`--spd`、`--cur` |
 | 20 | `20_arm_control_demo.py` | 手臂控制 + 回零（homing） | `--mode pos\|imp`、`--ramp s`、`--spd`、`--cur` |
-| 21 | `21_leg_control_demo.py` | 腿部控制 + 回零 ⚠️ 需安全支架 | `--mode pos\|imp`、`--ramp s`、`--spd`、`--cur` |
+| 21 | `21_vector_walk_demo.py` | 矢量行走接口：HRIC `/hric/robot/cmd_vel` 速度矢量流（前进/侧移/原地旋转→归零站立）。leg 关节由行走运控独占，SDK 不直控腿。给了 `--vy/--wz` 而未给 `--vx` 时 vx 自动归 0 | `--vx/--vy/--wz`、`--forward s`、`--hold s` |
 
 ### ⑤ 底层控制模式（仅 mock）
 
@@ -94,9 +94,12 @@ python3 examples/13_mic_record_demo.py --out /tmp/record.wav --backend mock
 1. 按仓库 README 的环境链顺序 source（xos 消息包须优先于
    `/opt/humanoid/install` 旧版本）；
 2. 14/17 inspire 手：先启动 `inspire_hand` 驱动（can0/can1）；
-3. **21 腿部**：机器人必须固定在安全支架上；
+3. **21 矢量行走**：遥控器切到半身/全身行走策略并 **e 键上拨进入话题控制**
+   后才可收到 cmd_vel 速度流；前进/侧移方向各留 1 m+、**涉及转向（--wz，
+   原地旋转）时 360° 需留出**无障碍空间（参考 `core/topics.py` 与
+   《具身天工DEX-矢量行走接口》文档）；
 4. **05 安全**：real 模式纯观测（不发关节指令），按/松急停按钮观察边沿事件；
-5. **18~21（关节运动）**：real 默认要求**终端回车确认**（保护：真机运动只能由人
+5. **18~21**：real 默认要求**终端回车确认**（保护：真机运动只能由人
    在终端触发）。stdin 非 TTY 的 AI/脚本/CI 调用会被拒绝（退出码 2），无真机的
    流程验证请用 `--backend mock` 或 `--backend sim`；
 6. **22**：拒绝 `--backend real`（低层模式直接下发有硬件风险，退出码 2）；
@@ -114,7 +117,9 @@ python3 examples/13_mic_record_demo.py --out /tmp/record.wav --backend mock
 ## 自动化测试
 
 `tests/test_examples.py`：22 个 demo 的类结构检查（继承 TienkungDex、`main`
-可调用）+ mock 全量运行断言（退出码 0）+ 22 拒绝 real 的守卫。
+可调用）+ mock 全量运行断言（退出码 0）+ 22 号（joint_modes）拒绝 real 的守卫。
+（18~21 的 real 拒绝发生在运行时交互路径——非 TTY 时退出码 2——由人工/脚本
+流程覆盖，不在单测内。）
 
 示例 CLI 默认已改为 **real**，回归测试则显式 `cls(backend='mock')` 实例化，
 两者互不依赖：CLI 默认值再变也不影响自动测试的确定性。

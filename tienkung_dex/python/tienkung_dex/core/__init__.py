@@ -23,6 +23,7 @@ from .base import (
     SbusStreamBase,
     SerialNumberBase,
     SubsystemBase,
+    VectorWalkBase,
 )
 from .errors import (
     BackendUnavailableError,
@@ -43,6 +44,7 @@ from .types import (
     PowerReading,
     SbusReading,
     TouchReading,
+    VelocityCommand,
     WrenchReading,
 )
 
@@ -62,9 +64,11 @@ __all__ = [
     'LightControlBase',
     'SbusStreamBase',
     'SerialNumberBase',
+    'VectorWalkBase',
     'ControlMode',
     'JointCommand',
     'JointReading',
+    'VelocityCommand',
     'CameraFrame',
     'ImuReading',
     'HandStatus',

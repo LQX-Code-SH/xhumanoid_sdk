@@ -34,6 +34,7 @@ def test_facade_assembles_all_subsystems(robot):
     assert robot.gps is not None and robot.force is not None
     assert robot.power is not None and robot.light is not None
     assert robot.sbus is not None and robot.serial is not None
+    assert robot.walk is not None
     assert robot.panorama is None  # excluded by default (optional hardware)
 
 
@@ -179,8 +180,40 @@ def test_enable_subset(robot):
         assert instance.audio is None
         assert instance.power is None
         assert instance.light is None
+        assert instance.walk is None           # walk excluded
     finally:
         instance.shutdown()
+
+
+def test_vector_walk_velocity_stream_and_stop(robot):
+    walk = robot.walk
+    walk.set_velocity(vx=0.3, vy=0.1, wz=0.2)
+    for _ in range(50):                        # drive the model 2.5 s
+        walk.step(0.05)
+    assert walk.velocity.vx == 0.3
+    assert walk.pose_x > 0.6                   # 0.3 * 2.5 = 0.75 m
+    assert walk.pose_y > 0.2 and walk.pose_yaw > 0.4
+    assert walk.publish_count >= 1
+    walk.stop()                                # zero setpoint, stream halts
+    assert walk.velocity.norm == 0.0
+    assert walk.history[-1].norm == 0.0
+    for _ in range(10):
+        walk.step(0.05)                        # standing: no more movement
+    assert abs(walk.pose_x - 0.75) < 0.01
+
+
+def test_vector_walk_clamp_estop_and_stop_norm(robot):
+    walk = robot.walk
+    walk.set_velocity(vx=99.0)                 # clamped to vx_max
+    assert walk.velocity.vx == walk.limits['vx_max'] == 1.0
+    walk.set_velocity(vx=0.02, vy=0.02)        # norm<0.05 -> standing zero
+    assert walk.velocity.norm == 0.0
+    robot.safety.set_estop(True)
+    with pytest.raises(EstopActiveError):
+        walk.set_velocity(vx=0.3)
+    robot.safety.set_estop(False)
+    walk.set_velocity(vx=0.3)                  # allowed again
+    assert walk.velocity.vx == 0.3
 
 
 def test_power_injection_and_observer(robot):

@@ -1,6 +1,6 @@
 # tienkung_dex — TienkungDex 机器人门面库
 
-面向 **具身天工 3.0** 的 SDK 能力统一封装（设计文档：主仓库 `docs/详细设计/09-TienkungDex机器人类设计.md`）。把一个门面类 `TienkungDex` 暴露给上层模块，屏蔽 20 个示例 demo 的约 30 个话题/服务与 5 个消息包；**实机（real）/ 仿真（sim）/ 内存桩（mock）三套后端共用一套接口**，仿真与离机开发不需要 `/opt/humanoid` 消息包。
+面向 **具身天工 3.0** 的 SDK 能力统一封装（设计文档：主仓库 `docs/详细设计/09-TienkungDex机器人类设计.md`）。把一个门面类 `TienkungDex` 暴露给上层模块，屏蔽底层 SDK 示例 demo 暴露的 30+ 个话题/服务与 8 个厂商消息包（`ros2_bridge_msgs`/`bodyctrl_msgs`/`lyre_msgs`/`interaction_msgs`/`brainco_hand_msgs`/`navigation_msgs`/`xsys_msgs`/`inspire_hand_msgs`）；**实机（real）/ 仿真（sim）/ 内存桩（mock）三套后端共用一套接口**，仿真与离机开发不需要 `/opt/humanoid` 消息包。
 
 ## 目录
 
@@ -9,19 +9,19 @@ tienkung_dex/
 ├── python/
 │   ├── package.xml  setup.py  resource/
 │   ├── launch/tienkung_dex.launch.py
-│   ├── config/joints.yaml            # 关节 ID 映射（附录 A：占位示例，待实机导出填写）
+│   ├── config/joints.yaml            # 关节 ID 映射（SDK 参考表 + 真机核对，2026-09）
 │   ├── tienkung_dex/
 │   │   ├── robot.py                  # TienkungDex 门面 + create_robot 工厂
 │   │   ├── demo_node.py              # 健康自检 demo 节点（真机验证用）
 │   │   ├── core/                     # 值对象 / 抽象基类 / 话题常量（仅标准消息）
 │   │   └── backends/
 │   │       ├── real/                 # 真机：SDK 话题适配（唯一 import *_msgs 的层；
-│   │       │                         #   joint/audio/camera/safety/sensors/
+│   │       │                         #   joint/audio/camera/safety/sensors/walk/
 │   │       │                         #   hand(brainco+inspire)/power/light/sbus/serial）
 │   │       ├── sim/                  # 仿真：ros_gz 桥接同名话题 + 两指手模型
 │   │       └── mock.py               # 内存桩：无 ROS 图，单测/故障注入
-│   ├── examples/                     # 20 个手动测试 demo（继承 TienkungDex，
-│   │                                 #   mock 默认；详见 examples/README.md）
+│   ├── examples/                     # 22 个手动测试 demo（继承 TienkungDex，
+│   │                                 #   real 默认；22 号仅 mock，详见 examples/README.md）
 │   └── tests/                        # pytest（headless，含 examples 结构/运行测试）
 └── README.md
 ```
@@ -89,7 +89,7 @@ source install/setup.bash
 ros2 launch tienkung_dex tienkung_dex.launch.py
 ```
 
-关节 ID 表：见 `python/config/joints.yaml`（占位）与设计文档附录 A 的导出核对方法；未填写完整前默认 `strict=false`（未知 ID 仅告警），可用 `create_robot(..., strict_joint_ids=True)` 强制拒绝。
+关节 ID 表：见 `python/config/joints.yaml`（已按 SDK 参考表全量填写，并经真机 `/robot_state` ID 集合核对一致：arm 14 / head 2 / waist 3 / leg 12；head 1/2 与 waist 31/32/33 的方向已由示例 18/19 实测确认，arm/leg 待微动复核，进度见文件头注释）。默认 `strict=false`（未知 ID 仅告警），`create_robot(..., strict_joint_ids=True)` 可强制拒绝。
 
 ## 单测（任意开发机，无需 ROS 图）
 
@@ -100,7 +100,7 @@ python3 -m pytest tests -q        # headless mock 后端（含 examples 测试�
 
 ## 示例（examples/，手动测试 SDK 完整接口）
 
-22 个 demo 脚本，全部**继承 TienkungDex**（`DemoBase` 基类复用 `create_robot()` 装配），序号按功能区域重排为真机测试先后顺序（① 状态观测 → ② 感知语音 → ③ 低风险执行 → ④ 躯干关节 → ⑤ 底层模式）。**默认 real 后端**：机器人算力主机上直接运行示例即连真机、拿真实数据；无真机的开发机/自动回归显式加 `--backend mock`（内存桩，不打印假数据冒充真机）。18~21（关节运动）默认 real 时要求**终端回车确认**才下发，AI/脚本/CI 等非 TTY 调用会被拒绝（退出码 2）：
+22 个 demo 脚本，全部**继承 TienkungDex**（`DemoBase` 基类复用 `create_robot()` 装配），序号按功能区域重排为真机测试先后顺序（① 状态观测 → ② 感知语音 → ③ 低风险执行 → ④ 全身关节/矢量行走控制 → ⑤ 底层控制模式）。**默认 real 后端**：机器人算力主机上直接运行示例即连真机、拿真实数据（仅 22 号默认 mock、拒绝 real）；无真机的开发机/自动回归显式加 `--backend mock`（内存桩，不打印假数据冒充真机）。18~20（关节运动）与 21（矢量行走）默认 real 时要求**终端回车确认**才下发，AI/脚本/CI 等非 TTY 调用会被拒绝（退出码 2）：
 
 ```bash
 cd tienkung_dex/python
@@ -126,7 +126,8 @@ python3 examples/03_robot_state.py --backend mock     # headless 桩（无真机
 11. **仿真关节桥接话题**（`/joint_states`、`/tienkung_dex/joint_cmds`）为库默认值，实际 ros_gz 桥接映射以主工程 `simulation` 配置为准（06 §5）。
 12. **子生命周期是一次性的**：`on_stop` 只释放引用、不销毁 rclpy 实体（订阅/发布器挂在节点上），stop→start 循环会产生重复句柄与重复回调；需要全新生命周期请重建 facade（`create_robot()`），节点销毁是资源回收点（设计决策，见 `core/base.py` SubsystemBase docstring）；
 13. **阻塞式服务调用**（`speak/play_file(blocking=True)`、`stop_playback`、`get_serial_number`）内部自行 spin 节点，**必须在 executor spin 线程之外调用**——从订阅/服务回调里调用会死锁或抛 RuntimeError；
-14. **sim 后端能力子集**：只支持 `joint/camera/panorama/hand/audio/safety/imu/lidar`，`enable` 里的其余键（power/light/sbus/serial/gps/force）无仿真等价物，对应门面属性为 None（工厂会告警）。
+14. **sim 后端能力子集**：只支持 `joint/camera/panorama/hand/audio/safety/imu/lidar`，`enable` 里的其余键（power/light/sbus/serial/gps/force/walk）无仿真等价物，对应门面属性为 None（工厂会告警）。
+15. **腿关节不开放、行走走运控速度流**：leg 关节由独立行走运控（run_patrol / RL 全身策略）独占，SDK 直控腿会与平衡控制冲突，因此不提供直驱双腿的示例；全身运动一律经 `robot.walk` 矢量行走子系统下发（`/hric/robot/cmd_vel` 速度矢量流，取值范围/话题见 `core/topics.py`，接口语义见《具身天工DEX-矢量行走接口.md》）。真机话题控制需遥控器先切到行走策略并 e 键上拨（示例 21 有完整前置提示）。cmd_vel 侧当前无经运控返回的闭环反馈话题，行走验证为发布面自检 + 目测。
 
 ## 设计模式（详见设计文档 §2）
 

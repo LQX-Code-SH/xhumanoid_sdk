@@ -21,6 +21,7 @@ from .safety import RealSafetyMonitor
 from .sbus import RealSbusStream
 from .sensors import ForceStream, GpsStream, ImuStream, LidarStream
 from .serial import RealSerialNumber
+from .walk import RealVectorWalk
 
 # Subsystems that degrade gracefully when their vendor message package is
 # missing (optional hardware); everything else is core to the real backend.
@@ -86,6 +87,9 @@ class RealBackendFactory:
         self._panorama_indices = params.get(
             'panorama_indices', t.PANORAMA_INDICES)
         self._panorama_compressed = params.get('panorama_compressed', False)
+        self._walk_cmd_topic = params.get('walk_cmd_topic', t.WALK_CMD_TOPIC)
+        self._walk_frame_id = params.get('walk_frame_id', t.WALK_CMD_FRAME_ID)
+        self._walk_rate_hz = params.get('walk.rate_hz', None)
 
         self._state_timeout = params.get('state.stale_timeout', 0.5)
         self._tts_timeout = params.get('service.tts_timeout', 3.0)
@@ -138,6 +142,19 @@ class RealBackendFactory:
         for key, subsystem in subsystems.items():
             if key.startswith('joint_'):
                 subsystem.attach_guard(safety.guard)
+
+        # Vector walking (HRIC cmd_vel): the legs are owned by the
+        # locomotion policy and must not be driven joint-wise - walking is
+        # requested as a body-frame velocity stream (see core.topics).
+        if self._wanted('walk'):
+            walk = RealVectorWalk(
+                self._node,
+                cmd_topic=self._walk_cmd_topic,
+                frame_id=self._walk_frame_id,
+                rate_hz=self._walk_rate_hz,
+                logger=self._log)
+            walk.attach_guard(safety.guard)
+            subsystems['walk'] = walk
 
         # Cameras (sensor_msgs only - always available).
         if self._wanted('camera'):

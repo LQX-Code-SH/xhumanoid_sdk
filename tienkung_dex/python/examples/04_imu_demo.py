@@ -6,9 +6,9 @@ mock:  inject 一条 ImuReading，验证 latest() / on_reading。
 real:  imu_source 选择数据源，spin 5 秒计帧。
 
 用法:
-    python3 examples/04_imu_demo.py                             # mock
-    python3 examples/04_imu_demo.py --backend real --source xsens
-    python3 examples/04_imu_demo.py --backend real --source livox
+    python3 examples/04_imu_demo.py                             # real（默认，xsens）
+    python3 examples/04_imu_demo.py --source livox             # 切换 IMU 数据源
+    python3 examples/04_imu_demo.py --backend mock             # headless 桩
 """
 
 import sys

@@ -8,6 +8,7 @@ executor callback thread and caller threads without copying.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from enum import IntEnum
 from typing import Optional, Tuple
@@ -44,6 +45,27 @@ class JointCommand:
     kp: float = 0.0        # stiffness (impedance mode)
     kd: float = 0.0        # damping (impedance mode)
     tor: float = 0.0       # torque feedforward
+
+
+@dataclass(frozen=True)
+class VelocityCommand:
+    """Robot-body-frame velocity-vector setpoint (矢量行走, HRIC cmd_vel).
+
+    vx: forward speed (m/s), vy: lateral speed (m/s), wz: turning speed
+    (rad/s). Per the vector-walk interface doc, ||(vx, vy, wz)|| < 0.05
+    makes the locomotion policy hold standing - backends treat any such
+    request as a full-zero stop setpoint.
+    """
+
+    vx: float = 0.0
+    vy: float = 0.0
+    wz: float = 0.0
+
+    @property
+    def norm(self) -> float:
+        """L2 norm of the velocity vector (m/s-equivalent units)."""
+        return math.sqrt(self.vx * self.vx + self.vy * self.vy
+                         + self.wz * self.wz)
 
 
 @dataclass(frozen=True)

@@ -120,3 +120,25 @@ INSPIRE_HAND_TOPICS = {
 SIM_JOINT_STATE_TOPIC = '/joint_states'        # sensor_msgs/JointState (gz)
 SIM_JOINT_CMD_TOPIC = '/tienkung_dex/joint_cmds'
 SIM_IMU_TOPIC = '/imu'                         # gz standard imu topic
+
+# --- vector walking (HRIC cmd_vel, robot host) ------------------------------
+# Reference: 具身天工DEX-矢量行走接口.md (飞书文档, 提取于 2026-09-03).
+# 腿部关节由行走运控（run_patrol / RL 全身策略）独占，SDK 不可直控 leg；
+# 行走只能经本机体系速度矢量流驱动。话题控制前需遥控器切到半身/全身/站走跑
+# 策略并 e 键上拨进入话题控制（此时遥控仅 c 键有效），随后以 ~20 Hz 持续发布
+# /hric/robot/cmd_vel（geometry_msgs/TwistStamped, frame 约定 'pelvis'）：
+#   linear.x = 前进 vx (m/s)、linear.y = 侧移 vy (m/s)、
+#   angular.z = 转向 wz (rad/s)；其余字段保持 0。
+# 三速度范数 < WALK_STOP_NORM 时机器人保持站立。
+WALK_CMD_TOPIC = '/hric/robot/cmd_vel'
+WALK_CMD_STATUS_TOPIC = '/hric/robot/cmd_vel_status'   # 遥控指令转发输出
+WALK_STATE_TOPIC = '/hric/robot/rl_state'              # diagnostic_msgs/DiagnosticStatus
+WALK_CMD_FRAME_ID = 'pelvis'
+# 取值范围表（全身/半身行走列；站走跑列上限更高：vx∈[-0.5,2.2]、wz∈[-1.0,1.0]）。
+WALK_LIMITS = {
+    'vx_min': -0.8, 'vx_max': 1.0,      # forward (m/s)
+    'vy_min': -0.5, 'vy_max': 0.5,      # lateral (m/s)
+    'wz_min': -0.8, 'wz_max': 0.8,      # yaw (rad/s)
+}
+WALK_STOP_NORM = 0.05                   # 范数低于该值 → 站立
+WALK_DEFAULT_RATE_HZ = 20.0             # 运控要求的持续指令流频率
