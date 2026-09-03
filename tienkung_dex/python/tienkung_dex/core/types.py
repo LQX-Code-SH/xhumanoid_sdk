@@ -186,15 +186,48 @@ class PowerReading:
     stamp: Optional[object] = None
 
 
+# 遥控器按键事件键码 —— 与 bodyctrl_msgs/SbusData.key_event_* 常量一致
+# (SbusData.msg: KEY_NONE=0 .. KEY_H_RIGHT=20)。事件语义（vendor 注释）：
+#   A-D  两态按键   UP=松开 / DOWN=按下
+#   E-F  三档拨动   UP=上拨 / MID=中间 / DOWN=下拨
+#   G-H  左右拨杆   LEFT=左拨 / MID=中间 / RIGHT=右拨
+# key_event_new = 变化后的事件；key_event_old = 变化前的事件。
+# button_a..h 电平位编码（vendor 注释）：-1=松开/复位, 0=中间位置,
+# 1=按下/拨到一端, 2=拨到另一端（两态键 A-D 一般仅出现 -1/1）。
+SBUS_KEY_NAME = {
+    0: 'NONE',
+    1: 'A_UP', 2: 'A_DOWN',
+    3: 'B_UP', 4: 'B_DOWN',
+    5: 'C_UP', 6: 'C_DOWN',
+    7: 'D_UP', 8: 'D_DOWN',
+    9: 'E_UP', 10: 'E_MID', 11: 'E_DOWN',
+    12: 'F_UP', 13: 'F_MID', 14: 'F_DOWN',
+    15: 'G_LEFT', 16: 'G_MID', 17: 'G_RIGHT',
+    18: 'H_LEFT', 19: 'H_MID', 20: 'H_RIGHT',
+}
+
+
 @dataclass(frozen=True)
 class SbusReading:
     """RC transmitter snapshot : joy axes + button events.
 
-    axes follows sensor_msgs/Joy (/sbus_data); buttons holds the raw
-    button_a..button_f fields of bodyctrl_msgs/SbusData (/sbus_data/event)
-    and stays empty when the vendor message package is unavailable.
+    axes follows sensor_msgs/Joy (/sbus_data) - the vendor publishes 12
+    raw axes in [-1, 1] covering 3 sticks (axis-index mapping pending a live
+    capture) and leaves Joy.buttons empty; buttons holds the raw
+    button_a..button_h fields of bodyctrl_msgs/SbusData (/sbus_data/event)
+    (8 keys, A-H), each encoded as -1 released / 0 middle / 1 or 2 an end
+    position, and stays empty when the vendor message package is
+    unavailable. event_new/event_old are the SbusData key_event codes after
+    and before the change (see SBUS_KEY_NAME / key_name()).
     """
 
     axes: Tuple[float, ...] = ()
-    buttons: Tuple[int, ...] = ()   # (A, B, C, D, E, F)
+    buttons: Tuple[int, ...] = ()   # (A..H) -1松/0中/1端/2端
+    event_new: int = 0              # 变化后事件键码 (key_event_new)
+    event_old: int = 0              # 变化前事件键码 (key_event_old)
     stamp: Optional[object] = None
+
+    @staticmethod
+    def key_name(code: int) -> str:
+        """Readable name of a SbusData key code (e.g. 17 -> 'G_RIGHT')."""
+        return SBUS_KEY_NAME.get(int(code), f'UNKNOWN({int(code)})')

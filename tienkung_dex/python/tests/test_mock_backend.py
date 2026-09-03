@@ -204,10 +204,12 @@ def test_light_set_mode_and_command_history(robot):
 
 def test_sbus_injection(robot):
     robot.sbus.inject(SbusReading(axes=(0.5, -0.2, 0.0, 0.0),
-                                  buttons=(1, 0, 0, 0, 0, 0)))
+                                  buttons=(1, 0, 0, 0, 0, 0),
+                                  event_new=17, event_old=16))
     latest = robot.sbus.latest()
     assert latest.axes[0] == 0.5
     assert latest.buttons[0] == 1
+    assert latest.event_new == 17 and latest.event_old == 16
 
 
 def test_serial_number(robot):

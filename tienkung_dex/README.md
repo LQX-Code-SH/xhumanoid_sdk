@@ -100,13 +100,13 @@ python3 -m pytest tests -q        # headless mock 后端（含 examples 测试�
 
 ## 示例（examples/，手动测试 SDK 完整接口）
 
-20 个 demo 脚本，全部**继承 TienkungDex**（`DemoBase` 基类复用 `create_robot()` 装配），序号按功能区域重排为真机测试先后顺序（① 状态观测 → ② 感知语音 → ③ 低风险执行 → ④ 躯干关节 → ⑤ 底层模式）。默认 mock 后端（任意开发机可跑），真机加 `--backend real`：
+22 个 demo 脚本，全部**继承 TienkungDex**（`DemoBase` 基类复用 `create_robot()` 装配），序号按功能区域重排为真机测试先后顺序（① 状态观测 → ② 感知语音 → ③ 低风险执行 → ④ 躯干关节 → ⑤ 底层模式）。**默认 real 后端**：机器人算力主机上直接运行示例即连真机、拿真实数据；无真机的开发机/自动回归显式加 `--backend mock`（内存桩，不打印假数据冒充真机）。18~21（关节运动）默认 real 时要求**终端回车确认**才下发，AI/脚本/CI 等非 TTY 调用会被拒绝（退出码 2）：
 
 ```bash
 cd tienkung_dex/python
-python3 examples/03_robot_state.py                    # mock：关节状态订阅
-python3 examples/18_arm_control_demo.py --mode imp    # mock：阻抗控制
-python3 examples/03_robot_state.py --backend real     # 真机（需 xos 环境链）
+python3 examples/03_robot_state.py                    # 默认 real：真机订阅
+python3 examples/20_arm_control_demo.py --mode imp    # real：回车确认后运动
+python3 examples/03_robot_state.py --backend mock     # headless 桩（无真机/回归）
 ```
 
 退出码 0 = 全部检查通过（`test_demos.sh` 风格）。完整列表、参数与安全边界见 [examples/README.md](python/examples/README.md)；裁剪说明：六维力由单测覆盖、整库健康自检用 `demo_node` 的 `once` 模式，均不重复设示例。
@@ -120,7 +120,7 @@ python3 examples/03_robot_state.py --backend real     # 真机（需 xos 环境�
 5. **全景 6 目相机**（选配）：默认不启用（`enable` 不含 `panorama`），且非 Bi-View 感知源（仅能力封装）；压缩话题需 cv2 才能解码，推荐 raw；
 6. **急停消息类名**未被任何 demo 钉死：`_msgs.key_status_msg()` 按候选名探测 `is_estop` 字段；探测失败时安全监测降级（`is_active=False`、拦截关闭，日志告警）。`is_active` 为**数据时限语义**（key_status 实测 ~12.6 Hz，默认 0.5 s 时限）：健康自检中 safety 变红 = key_status 流断流（急停源失联），不再是"已订阅即绿"；
 7. **电源板/电池**：`power` 子系统只提取已验证的主电池三值（电压/电流/功率）与急停键位；`/power/board/status` 仅作在线性计数，其字段未提取；
-8. **SBUS 按键事件**依赖 `bodyctrl_msgs/SbusData`；缺失时摇杆（标准 `Joy`）仍可用，`SbusReading.buttons` 恒为空；
+8. **SBUS 遥控器**：摇杆/档位共 12 路轴走 `/sbus_data`（`sensor_msgs/Joy`，范围 [-1,1]，`buttons` 恒空）；按键与事件走 `/sbus_data/event`（`bodyctrl_msgs/SbusData`），缺失时摇杆仍可用而 `SbusReading.buttons`/事件字段为 0。`buttons` 为 A-H 8 键档位电平（-1 松/复位、0 中位、1/2 端位）；`key_event_new`=变化后事件、`key_event_old`=变化前事件（键码见 `SBUS_KEY_NAME` / `SbusReading.key_name()`：A-D 松开/按下、E-F 上中下拨、G-H 左中右拨）；
 9. **灯带**为纯发布子系统（命令码表见 `core/topics.LIGHT_CMDS`），`is_active` 只反映发布者创建状态（无反馈话题可核）；
 10. **头部电机 2 限位**：外部参考脚本写 `[-15, 50]°`，SDK 参考表/joints.yaml 写 `[-15, 58]°`（1.0123 rad），待真机微动核对后再开 strict 模式。
 11. **仿真关节桥接话题**（`/joint_states`、`/tienkung_dex/joint_cmds`）为库默认值，实际 ros_gz 桥接映射以主工程 `simulation` 配置为准（06 §5）。

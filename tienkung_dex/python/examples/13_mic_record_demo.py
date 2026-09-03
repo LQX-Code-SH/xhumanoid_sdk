@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""11 语音录制（项目特有：start/stop_recording + AudioRingBuffer 快照）。
+"""13 麦克风录制（对应 ROS 包 mic_record_demo：start/stop 录制 + wav 写盘）。
+
+SDK 侧：audio.start_recording() 调 /lyre/audio_control(enable=True)，
+订阅 /lyre/audio_stream 收 AudioFrame；stop_recording() 返回环形缓冲
+快照（AudioChunk 列表），可写为 16-bit PCM wav。
 
 mock:  注入 3 个合成音频块，验证录制时长合计。
 real:  录制 --seconds 秒后停止；--out 用 stdlib wave 写 16-bit PCM 单声道。
 
 用法:
-    python3 examples/11_audio_record_demo.py
-    python3 examples/11_audio_record_demo.py --out /tmp/record.wav
-    python3 examples/11_audio_record_demo.py --backend real --seconds 5 --out /tmp/record.wav
+    python3 examples/13_mic_record_demo.py
+    python3 examples/13_mic_record_demo.py --out /tmp/record.wav
+    python3 examples/13_mic_record_demo.py --backend real --seconds 5 --out /tmp/record.wav
 """
 
 import sys
@@ -19,9 +23,9 @@ except ImportError:                       # 直接脚本运行（无包上下文
     from _demo_base import DemoBase
 
 
-class AudioRecordDemo(DemoBase):
+class MicRecordDemo(DemoBase):
 
-    def __init__(self, backend='mock', seconds=5.0, out=None):
+    def __init__(self, backend='real', seconds=5.0, out=None):
         super().__init__(backend, enable={'audio'})
         self.seconds = seconds
         self.out = out
@@ -70,14 +74,14 @@ class AudioRecordDemo(DemoBase):
 def main(argv=None):
     import argparse
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument('--backend', default='mock',
+    parser.add_argument('--backend', default='real',
                         choices=['mock', 'real', 'sim'])
     parser.add_argument('--seconds', type=float, default=5.0,
                         help='real 模式录制秒数')
     parser.add_argument('--out', help='输出 wav 文件路径（可选）')
     args = parser.parse_args(argv)
-    return AudioRecordDemo(backend=args.backend, seconds=args.seconds,
-                           out=args.out).run()
+    return MicRecordDemo(backend=args.backend, seconds=args.seconds,
+                         out=args.out).run()
 
 
 if __name__ == '__main__':

@@ -20,7 +20,7 @@ except ImportError:                       # 直接脚本运行（无包上下文
 
 class SerialNumberDemo(DemoBase):
 
-    def __init__(self, backend='mock'):
+    def __init__(self, backend='real'):
         super().__init__(backend, enable={'serial'})
 
     def _demo(self):
@@ -32,7 +32,7 @@ class SerialNumberDemo(DemoBase):
 def main(argv=None):
     import argparse
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument('--backend', default='mock',
+    parser.add_argument('--backend', default='real',
                         choices=['mock', 'real', 'sim'])
     args = parser.parse_args(argv)
     return SerialNumberDemo(backend=args.backend).run()

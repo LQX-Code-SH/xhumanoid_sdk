@@ -285,7 +285,7 @@ class MockAudioSystem(AudioSystemBase):
                   timeout: float = 3.0) -> bool:
         return self._speak_result
 
-    def stop_playback(self) -> bool:
+    def stop_playback(self, timeout: float = 5.0) -> bool:
         return True
 
     def start_recording(self) -> bool:

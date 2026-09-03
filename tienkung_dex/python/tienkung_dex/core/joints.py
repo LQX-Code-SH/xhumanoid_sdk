@@ -34,6 +34,9 @@ class JointTable:
 
     def _load(self, table: dict) -> None:
         for group, entries in table.items():
+            if not isinstance(entries, list):
+                # 非关节参数组（如 home_standing 参考数据块）不参与关节表。
+                continue
             metas = {}
             for entry in entries or []:
                 metas[int(entry['id'])] = JointMeta(

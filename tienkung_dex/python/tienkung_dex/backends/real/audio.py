@@ -88,6 +88,7 @@ class RealAudioSystem(AudioSystemBase):
         self._frame_cbs: list[Callable[[AudioChunk], None]] = []
         self._voice_cbs: list[tuple[Callable[[dict], None], Optional[set]]] = []
         self._last_frame_monotonic = None
+        self._spin_executor = None
 
     def on_start(self) -> None:
         self._tts_cls, err = _msgs.tts_service()
@@ -178,9 +179,11 @@ class RealAudioSystem(AudioSystemBase):
         try:
             executor = getattr(self._node, 'executor', None)
             if executor is None:
-                from rclpy.executors import SingleThreadedExecutor
-                executor = SingleThreadedExecutor()
-                executor.add_node(self._node)
+                if self._spin_executor is None:
+                    from rclpy.executors import SingleThreadedExecutor
+                    self._spin_executor = SingleThreadedExecutor()
+                    self._spin_executor.add_node(self._node)
+                executor = self._spin_executor
             executor.spin_until_future_complete(future, timeout_sec=timeout)
         except Exception as exc:  # pragma: no cover - spin environment
             if self._log is not None:
@@ -203,8 +206,15 @@ class RealAudioSystem(AudioSystemBase):
                   timeout: float = 3.0) -> bool:
         return self._call_tts(path, 'file', 'append', blocking, timeout)
 
-    def stop_playback(self) -> bool:
-        return self._call_tts('', 'text', 'stop', blocking=True, timeout=2.0)
+    def stop_playback(self, timeout: float = 5.0) -> bool:
+        """Stop current playback (cmd=stop).
+
+        Service replies in ~0s when healthy, but the host TTS service may
+        respond slowly while synthesising/interrupting; 2s was observed to
+        flake on the robot, so default to 5s (overridable).
+        """
+        return self._call_tts('', 'text', 'stop', blocking=True,
+                              timeout=timeout)
 
     # -- recording --------------------------------------------------------
     def start_recording(self) -> bool:

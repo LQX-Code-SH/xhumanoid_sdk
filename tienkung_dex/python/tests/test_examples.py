@@ -29,17 +29,19 @@ MODULES = {
     '07_lidar_demo': 'LidarDemo',
     '08_gps_demo': 'GpsDemo',
     '09_camera_demo': 'CameraDemo',
-    '10_audio_ai_demo': 'AudioAiDemo',
-    '11_audio_record_demo': 'AudioRecordDemo',
-    '12_hand_state_demo': 'HandStateDemo',
-    '13_light_demo': 'LightDemo',
-    '14_hand_brainco_demo': 'BraincoHandDemo',
-    '15_hand_inspire_demo': 'InspireHandDemo',
-    '16_head_control_demo': 'HeadControlDemo',
-    '17_waist_control_demo': 'WaistControlDemo',
-    '18_arm_control_demo': 'ArmControlDemo',
-    '19_leg_control_demo': 'LegControlDemo',
-    '20_joint_modes_demo': 'JointModesDemo',
+    '10_play_text_demo': 'PlayTextDemo',
+    '11_speaker_play_demo': 'SpeakerPlayDemo',
+    '12_speech_recognition_demo': 'SpeechRecognitionDemo',
+    '13_mic_record_demo': 'MicRecordDemo',
+    '14_hand_state_demo': 'HandStateDemo',
+    '15_light_demo': 'LightDemo',
+    '16_hand_brainco_demo': 'BraincoHandDemo',
+    '17_hand_inspire_demo': 'InspireHandDemo',
+    '18_head_control_demo': 'HeadControlDemo',
+    '19_waist_control_demo': 'WaistControlDemo',
+    '20_arm_control_demo': 'ArmControlDemo',
+    '21_leg_control_demo': 'LegControlDemo',
+    '22_joint_modes_demo': 'JointModesDemo',
 }
 
 
@@ -68,7 +70,7 @@ def test_demo_runs_green_on_mock(module_name, capsys):
 
 
 def test_joint_modes_demo_refuses_real():
-    mod = importlib.import_module('examples.20_joint_modes_demo')
+    mod = importlib.import_module('examples.22_joint_modes_demo')
     with pytest.raises(SystemExit) as exc:
         mod.JointModesDemo(backend='real')
     assert exc.value.code == 2

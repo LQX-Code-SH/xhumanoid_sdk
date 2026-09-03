@@ -4,8 +4,14 @@
 # 并与真机 /robot_state 实测 ID 集合核对一致（arm 11~17/21~27、head 1/2、
 # waist 31~33、leg 51~56/61~66，共 31 个）。
 #
-# 仍待验证（附录 A 步骤 2）：手动微动单关节，核对 ID <-> 关节名 <->
-# 运动方向与运动范围，全部一致后才建议开启 strict 模式。
+# 方向验证进度（附录 A 步骤 2，2026-09-03）：
+#   head 1/2 已通过 18 大摆/点头实测确认方向语义（head_yaw 正值=转向机器人自身
+#   左侧、head_pitch 正值=低头），±两侧边界幅度仍建议 vendor 微动复核；
+#   waist 31/32/33 已通过 19 三轴实测确认方向语义（waist_pitch 正值=前倾、
+#   waist_roll 正值=向自身右侧倾、waist_yaw 正值=向自身左侧转，
+#   详见下方 waist 段注释）；
+#   arm/leg 其余关节仍待微动核对 ID <-> 关节名 <->
+#   运动方向与运动范围，全部一致后才建议开启 strict 模式。
 #
 # 注：旧占位表曾写 21 限位 [-1.588, 0.0]（single_joint_control demo 的
 # 目标值），与全量表（±163°）不冲突——demo 目标在限位之内，已按全量表修正。
@@ -28,11 +34,26 @@ arm:
   - {id: 26, name: right_wrist_pitch,    limits: [-1.3265, 1.3265]}
   - {id: 27, name: right_wrist_roll,     limits: [-1.3265, 1.3265]}
 head:
+  # 方向语义（基准 = 机器人自身视角，2026-09-03 真机 18 实测）：
+  #   joint 1 head_yaw:   正值 → 转向机器人自身左侧；负值 → 自身右侧。
+  #                       目测证据：18 从 0 起摆 +0.6 rad 首半圈即朝自身左侧。
+  #   joint 2 head_pitch: 正值 → 低头（下压）；负值 → 抬头（受机械挡仅约 -15°）。
+  #                       证据：18 +0.7 rad 低头到位，且与限位不对称分布
+  #                       （-15°~+58°，负向=抬头被后脑/颈部结构限制）自洽。
   - {id: 1, name: head_yaw,   limits: [-1.0472, 1.0472]}
   # 注：vendor demo 03_head_control 写电机 2 上限 50°（0.8727 rad），
   # 本表按 SDK 参考表取 58°（1.0123 rad），差异待真机微动核对（README 已知限制 10）。
   - {id: 2, name: head_pitch, limits: [-0.2618, 1.0123]}
 waist:
+  # 方向语义（基准 = 机器人自身视角，2026-09-03 真机 19 实测，pos 插值到位）：
+  #   joint 31 waist_pitch: 正值 → 躯干前倾（朝腹侧/肚子方向下弯）；负值 → 后仰。
+  #                       证据：19 目标 +0.20 rad（actual 0.177）目测躯干前倾。
+  #   joint 32 waist_roll:  正值 → 躯干向机器人自身右侧倾；负值 → 左侧倾。
+  #                       证据：19 目标 +0.15 rad（actual 0.134）目测躯干右倾。
+  #   joint 33 waist_yaw:   正值 → 上半身向机器人自身左侧转；负值 → 右侧转。
+  #                       证据：19 目标 +0.25 rad（actual 0.248）目测上半身左转。
+  #                       注：yaw 需带动整个上半身、负载最大，pos 直发须 cur>=40
+  #                       （默认 cur=10 实测仅到 0.002 rad，见 19 docstring）。
   - {id: 31, name: waist_pitch, limits: [-0.5236, 0.8727]}
   - {id: 32, name: waist_roll,  limits: [-0.4363, 0.4363]}
   - {id: 33, name: waist_yaw,   limits: [-2.6180, 3.2289]}
@@ -49,3 +70,96 @@ leg:
   - {id: 64, name: right_knee_pitch,  limits: [-0.0873, 2.5307]}
   - {id: 65, name: right_ankle_pitch, limits: [-1.1868, 0.5236]}
   - {id: 66, name: right_ankle_roll,  limits: [-0.5236, 0.5236]}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# home 参考模块（与上方关节参数表分开维护，loader 忽略此非 list 块）
+#
+# 站立 home（真机 03_robot_state 实测，2026-09-03 单次快照，单位：rad）：
+#   机器人自然站立（未施加指令）时的默认读数，并非 0——leg 站立本就有姿态
+#   补偿（膝 54≈+0.368/64≈+0.341 rad 微屈、髋 pitch/踝 pitch 带负值），
+#   arm 亦非全 0（如肘 14≈-0.496）。故 leg/arm 类承载 demo 应采用
+#   "动作前读数=home，结束后回 home"基准，勿"回 0"（示例 21 已按此实现）。
+#   home 只作参考快照，运行时仍以当帧现场读数为准。
+#
+# 结构：键 = 关节 id；值 = 站立读数（rad）。可与上方 arm/head/waist/leg 段
+# 交叉引用关节名。
+# ─────────────────────────────────────────────────────────────────────────────
+home_standing:
+  11: 0.2219        # arm  left_shoulder_pitch
+  12: 0.1361        # arm  left_shoulder_roll
+  13: 0.0231        # arm  left_shoulder_yaw
+  14: -0.4959       # arm  left_elbow_pitch
+  15: 0.0013        # arm  left_wrist_yaw
+  16: 0.0035        # arm  left_wrist_pitch
+  17: -0.0006       # arm  left_wrist_roll
+  21: 0.1770        # arm  right_shoulder_pitch
+  22: -0.1469       # arm  right_shoulder_roll
+  23: 0.0048        # arm  right_shoulder_yaw
+  24: -0.3612       # arm  right_elbow_pitch
+  25: 0.0003        # arm  right_wrist_yaw
+  26: 0.0015        # arm  right_wrist_pitch
+  27: -0.0007       # arm  right_wrist_roll
+  1: 0.0008         # head head_yaw
+  2: 0.0006         # head head_pitch
+  31: 0.0327        # waist waist_pitch
+  32: 0.0067        # waist waist_roll
+  33: 0.0019        # waist waist_yaw
+  51: -0.1441       # leg  left_hip_pitch
+  52: -0.0063       # leg  left_hip_roll
+  53: -0.0055       # leg  left_hip_yaw
+  54: 0.3680        # leg  left_knee_pitch   ← 站姿膝本就微屈，勿以 0 为基准
+  55: -0.1672       # leg  left_ankle_pitch
+  56: -0.1740       # leg  left_ankle_roll
+  61: -0.1469       # leg  right_hip_pitch
+  62: 0.0035        # leg  right_hip_roll
+  63: 0.0246        # leg  right_hip_yaw
+  64: 0.3414        # leg  right_knee_pitch  ← 站姿膝本就微屈，勿以 0 为基准
+  65: -0.1372       # leg  right_ankle_pitch
+  66: -0.1400       # leg  right_ankle_roll
+
+# ─────────────────────────────────────────────────────────────────────────────
+# home2 参考模块 —— 半身运控模式（上肢运动接口开放前）站立快照
+#
+# 场景：真机开放上肢（arm）运动接口前，须先把机器人切换到"半身运控模式"
+# （下半身运控保持站立/平衡，上肢关节释放给外部 POSITION 控制）。该模式下
+# 机器人会稍作下蹲——对照上方 home_standing（普通站立，2026-09-03 早前
+# 快照）可见腿部差异明显：髋 pitch 51 −0.144→−0.335 / 61 −0.147→−0.352，
+# 膝 pitch 54 +0.368→+0.586 / 64 +0.341→+0.550（下蹲加深 ~20°），踝 pitch
+# 55 −0.167→−0.247 / 65 −0.137→−0.154；臂/腰差异微小（14 −0.496→−0.500、
+# 24 −0.361→−0.363），故 demo 动作仍以当帧现场读数为基准即可。
+#
+# 结构同 home_standing：键 = 关节 id；值 = 半身运控模式下读数（rad）。
+# 与关节参数表分开维护，loader 同样忽略此非 list 块。
+# ─────────────────────────────────────────────────────────────────────────────
+home2:
+  11: 0.2200        # arm  left_shoulder_pitch
+  12: 0.1287        # arm  left_shoulder_roll
+  13: 0.0262        # arm  left_shoulder_yaw
+  14: -0.5004       # arm  left_elbow_pitch
+  15: 0.0014        # arm  left_wrist_yaw
+  16: 0.0070        # arm  left_wrist_pitch
+  17: -0.0022       # arm  left_wrist_roll
+  21: 0.1733        # arm  right_shoulder_pitch
+  22: -0.1440       # arm  right_shoulder_roll
+  23: 0.0001        # arm  right_shoulder_yaw
+  24: -0.3625       # arm  right_elbow_pitch
+  25: 0.0002        # arm  right_wrist_yaw
+  26: 0.0080        # arm  right_wrist_pitch
+  27: -0.0006       # arm  right_wrist_roll
+  1: 0.0007         # head head_yaw
+  2: 0.0006         # head head_pitch
+  31: -0.0002       # waist waist_pitch
+  32: 0.0078        # waist waist_roll
+  33: 0.0043        # waist waist_yaw
+  51: -0.3350       # leg  left_hip_pitch
+  52: -0.0326       # leg  left_hip_roll
+  53: -0.0215       # leg  left_hip_yaw
+  54: 0.5855        # leg  left_knee_pitch   ← 下蹲加深，勿以 home_standing 为基准
+  55: -0.2466       # leg  left_ankle_pitch
+  56: -0.2136       # leg  left_ankle_roll
+  61: -0.3516       # leg  right_hip_pitch
+  62: -0.0013       # leg  right_hip_roll
+  63: 0.1108        # leg  right_hip_yaw
+  64: 0.5503        # leg  right_knee_pitch  ← 下蹲加深，勿以 home_standing 为基准
+  65: -0.1540       # leg  right_ankle_pitch
+  66: -0.1997       # leg  right_ankle_roll

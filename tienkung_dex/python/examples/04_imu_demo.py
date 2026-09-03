@@ -21,7 +21,7 @@ except ImportError:                       # 直接脚本运行（无包上下文
 
 class ImuDemo(DemoBase):
 
-    def __init__(self, backend='mock', source='xsens'):
+    def __init__(self, backend='real', source='xsens'):
         super().__init__(backend, enable={'imu'}, imu_source=source)
 
     def _demo(self):
@@ -48,7 +48,7 @@ class ImuDemo(DemoBase):
 def main(argv=None):
     import argparse
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument('--backend', default='mock',
+    parser.add_argument('--backend', default='real',
                         choices=['mock', 'real', 'sim'])
     parser.add_argument('--source', default='xsens',
                         choices=['xsens', 'livox'],

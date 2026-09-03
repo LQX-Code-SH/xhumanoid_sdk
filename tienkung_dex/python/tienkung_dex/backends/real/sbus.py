@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Real RC SBUS receiver : Joy axes + SbusData buttons.
+"""Real RC SBUS receiver : Joy axes + SbusData buttons/events.
 
-The joystick path (/sbus_data, sensor_msgs/Joy) is standard and always
-available; the button event path (/sbus_data/event, bodyctrl_msgs/SbusData)
-degrades gracefully - buttons stay empty when the package is missing.
+Data layout (vendor): /sbus_data carries a sensor_msgs/Joy with 12 axes in
+[-1, 1] (3 sticks; per-stick axis mapping pending live capture) and an
+unused, always-empty buttons array; the actual key levels/events live in
+/sbus_data/event (bodyctrl_msgs/SbusData).
+The joy path is standard and always available; the event path degrades
+gracefully - button/event fields stay zero when the package is missing.
 """
 
 from __future__ import annotations
@@ -31,6 +34,8 @@ class RealSbusStream(SbusStreamBase):
         self._sub_event = None
         self._axes = ()
         self._buttons = ()
+        self._event_new = 0
+        self._event_old = 0
         self._last_seen = None
 
     def on_start(self) -> None:
@@ -64,9 +69,16 @@ class RealSbusStream(SbusStreamBase):
             self._emit(reading)
 
     def _on_event(self, msg) -> None:
+        # SbusData declares button_a..button_h (8 keys, A-H), levels
+        # -1 released / 0 middle / 1,2 ends; all 8 are forwarded.
         self._buttons = tuple(int(getattr(msg, field, 0)) for field in
                               ('button_a', 'button_b', 'button_c',
-                               'button_d', 'button_e', 'button_f'))
+                               'button_d', 'button_e', 'button_f',
+                               'button_g', 'button_h'))
+        # key_event_new = state after the change, key_event_old = state
+        # before it (KEY_* codes of SbusData.msg, see SbusReading.key_name()).
+        self._event_new = int(getattr(msg, 'key_event_new', 0))
+        self._event_old = int(getattr(msg, 'key_event_old', 0))
         # A button event proves the receiver is alive even before the first
         # Joy message (and keeps is_active fresh on event-only streams).
         self._last_seen = time.monotonic()
@@ -77,4 +89,6 @@ class RealSbusStream(SbusStreamBase):
     def latest(self) -> Optional[SbusReading]:
         if self._last_seen is None:
             return None
-        return SbusReading(axes=self._axes, buttons=self._buttons)
+        return SbusReading(axes=self._axes, buttons=self._buttons,
+                           event_new=self._event_new,
+                           event_old=self._event_old)

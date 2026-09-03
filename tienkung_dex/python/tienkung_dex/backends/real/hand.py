@@ -11,6 +11,7 @@ tangential_direction1 (65535 = N/A), self_proximity1, status.
 
 from __future__ import annotations
 
+import time
 from typing import Callable, Optional, Sequence
 
 from tienkung_dex.core.base import DexterousHandBase
@@ -24,6 +25,56 @@ from tienkung_dex.core.presets import GESTURE_POSITIONS  # noqa: E402
 
 MOTOR_COUNT = 6
 POS_MIN, POS_MAX = 1, 1000
+
+# 部分手势在真机上的分段执行序列（避免关节机械干涉）。
+# 'rock' 若让拇指 flex 与四指同时朝掌心弯曲会发生干涉（实测食指/中指被
+# 卡在 ~630/600）；四指全收后拇指 flex 还会被食指/中指干涉，上限约 ~690
+# （仅该干涉状态成立：无干涉时如 scissors，thumb flex 仍可达 1000，见
+# core presets 注），preset 已校准为 685 这一可达形位。故拆两段执行
+# （终态=preset）：
+#   1) thumb flex 伸直、rotate 至最终外展位、四指收拢到 1000；
+#   2) 四指保持，再弯拇指至 preset 终态。
+# 阶段间轮询 MotorStatus 等待到位/停滞，避免相位叠加（见 _run_sequence）。
+_GESTURE_SEQUENCES = {
+    'rock': (
+        (POS_MIN, 700, 1000, 1000, 1000, 1000),   # 拇指外展 + 四指弯曲
+        GESTURE_POSITIONS['rock'],                # 再弯拇指（rock 可达终态）
+    ),
+}
+
+
+def _wait_pub_matched(node, log, label: str, pub, timeout: float = 3.0) -> bool:
+    """Publish 前等待至少一个匹配的订阅者（Fast-DDS discovery 滞后）。
+
+    短命节点 create_publisher 后立即 publish 时，首帧常在 discovery 完成前
+    发出而被系统端静默丢弃（实测：16 demo set_gesture('ok') 返回成功但手不
+    动；同一消息用常驻 1Hz 重发，~1.7s discovery 稳定后手正常执行）。判断
+    依据是发布端实际匹配数（get_subscription_count），订阅侧收到首帧不代
+    表本 publisher 已就绪。边 spin 边轮询：复用 node.executor（若已挂载，
+    见 DemoBase），否则 rclpy.spin_once。
+    """
+    if pub is None:
+        return False
+    import rclpy
+    executor = getattr(node, 'executor', None)
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            if pub.get_subscription_count() > 0:
+                return True
+        except Exception:
+            pass
+        try:
+            if executor is not None:
+                executor.spin_once(timeout_sec=0.05)
+            else:
+                rclpy.spin_once(node, timeout_sec=0.05)
+        except Exception:
+            time.sleep(0.05)
+    if log is not None:
+        log.warn(f'{label}: {timeout:.0f}s 内未发现匹配订阅者'
+                 '（系统端 hand 节点未运行/被占用？），仍尝试发送')
+    return False
 
 
 class RealDexterousHand(DexterousHandBase):
@@ -104,6 +155,7 @@ class RealDexterousHand(DexterousHandBase):
     def _publish(self, positions, speeds=None, currents=None) -> None:
         if self._pub is None:
             raise RuntimeError(f'{self.name} not started')
+        _wait_pub_matched(self._node, self._log, self.name, self._pub)
         msg = self._msg_cls()
         msg.mode = self._control_mode
         positions = tuple(positions)[:MOTOR_COUNT]
@@ -121,6 +173,50 @@ class RealDexterousHand(DexterousHandBase):
         clipped = tuple(max(POS_MIN, min(POS_MAX, int(p))) for p in positions)
         self._publish(clipped)
 
+    # -- sequenced control --------------------------------------------------
+    def _spin_once(self, timeout_sec: float = 0.05) -> None:
+        """复用 node.executor（DemoBase 已挂载）spin，否则 rclpy.spin_once。"""
+        import rclpy
+        executor = getattr(self._node, 'executor', None)
+        try:
+            if executor is not None:
+                executor.spin_once(timeout_sec=timeout_sec)
+            else:
+                rclpy.spin_once(self._node, timeout_sec=timeout_sec)
+        except Exception:
+            time.sleep(timeout_sec)
+
+    def _spin_until(self, target: Sequence[int], tol: float = 60.0,
+                    stall: float = 1.0, timeout: float = 8.0) -> None:
+        """轮询 MotorStatus 直到与 target 偏差 ≤ tol（或到位趋势停滞），
+        保证序列下一相位不在真机位置插值完成前叠加。真机插值约 0.6s /
+        1000 单位，机械堵转时以"最佳偏差 1s 无改善"结束等待而不死等。"""
+        deadline = time.monotonic() + timeout
+        best: Optional[float] = None
+        best_at: Optional[float] = None
+        while time.monotonic() < deadline:
+            st = self.get_status()
+            if st is not None and len(st.positions) >= len(target):
+                cur = tuple(int(v) for v in st.positions[:len(target)])
+                d = max(abs(a - b) for a, b in zip(cur, target))
+                if best is None or d < best - 1.0:
+                    best, best_at = d, time.monotonic()
+                if d <= tol:
+                    return
+                if best_at is not None and time.monotonic() - best_at > stall:
+                    return                     # 停滞（堵转/限位），不阻塞序列
+            self._spin_once(0.1)
+        if self._log is not None:
+            self._log.warn(f'{self.name}: 序列相位等待超时（{timeout:.0f}s）')
+
+    def _run_sequence(self, phases) -> None:
+        for step, target in enumerate(phases, 1):
+            self._publish(target)
+            if self._log is not None:
+                self._log.info(f'{self.name}: 手势分段 {step}/{len(phases)} '
+                               f'→ {list(target)}')
+            self._spin_until(target)
+
     def set_gesture(self, gesture: str) -> bool:
         preset = GESTURE_POSITIONS.get(gesture)
         if preset is None:
@@ -129,7 +225,11 @@ class RealDexterousHand(DexterousHandBase):
                     f'{self.name}: unknown gesture {gesture!r} '
                     f'(known: {sorted(GESTURE_POSITIONS)})')
             return False
-        self._publish(preset)
+        seq = _GESTURE_SEQUENCES.get(gesture)
+        if seq is not None:
+            self._run_sequence(seq)          # 分段执行（防关节干涉）
+        else:
+            self._publish(preset)
         return True
 
     def set_force(self, forces: Sequence[int]) -> None:
@@ -251,6 +351,8 @@ class RealInspireHand(DexterousHandBase):
     def _publish(self, kind: str, values: Sequence[int]) -> None:
         if kind not in self._pubs:
             raise RuntimeError(f'{self.name} not started')
+        _wait_pub_matched(self._node, self._log, self.name,
+                          self._pubs[kind])
         msg = self._msg_cls[kind]()
         msg.hand_id = 1 if self.side == 'left' else 2
         msg.joint_values = self._joint_values(values)

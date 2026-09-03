@@ -243,15 +243,22 @@ def test_sbus_event_before_joy_emits_buttons_and_counts_liveness():
     updates = []
     sbus.on_update(updates.append)
     sbus._on_event(SimpleNamespace(button_a=1, button_b=0, button_c=0,
-                                   button_d=0, button_e=0, button_f=0))
+                                   button_d=0, button_e=0, button_f=0,
+                                   button_g=1, button_h=1,
+                                   key_event_new=17, key_event_old=16))
     assert len(updates) == 1
-    assert updates[0].buttons == (1, 0, 0, 0, 0, 0)
+    assert updates[0].buttons == (1, 0, 0, 0, 0, 0, 1, 1)
+    assert updates[0].event_new == 17 and updates[0].event_old == 16
+    assert updates[0].key_name(17) == 'G_RIGHT'
+    assert updates[0].key_name(0) == 'NONE'
+    assert updates[0].key_name(-3) == 'UNKNOWN(-3)'
     assert updates[0].axes == ()
     assert sbus.is_active
 
     sbus._on_joy(SimpleNamespace(axes=(0.5, -0.2)))
     assert updates[-1].axes == (0.5, -0.2)
-    assert updates[-1].buttons == (1, 0, 0, 0, 0, 0)
+    assert updates[-1].buttons == (1, 0, 0, 0, 0, 0, 1, 1)
+    assert updates[-1].event_new == 17  # 事件字段随 joy 帧合并保持
 
 
 # --- regression: stale plane must not block the camera stream -------------

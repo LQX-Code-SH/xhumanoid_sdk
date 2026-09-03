@@ -247,11 +247,11 @@ class CameraDisplayNode(Node):
         if not np.any(mask):
             return None
 
-        # calcHist range is [min, max): extend by 1 so pixels saturated at
-        # max_depth (rendered at the top colormap color) still show up in
-        # the last bin instead of being silently dropped.
+        # calcHist returns a (256,1) column vector; flatten it to 1-D before
+        # drawing, otherwise hist[i] is a 1-element array and int() on it
+        # triggers NumPy >= 1.25 DeprecationWarning (an error in the future).
         hist = cv2.calcHist([depth], [0], mask.astype(np.uint8), [256],
-                            [cam.min_depth, cam.max_depth + 1])
+                            [cam.min_depth, cam.max_depth + 1]).ravel()
         cv2.normalize(hist, hist, 0, 1, cv2.NORM_MINMAX)
 
         hist_h, hist_w = 200, 512

@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""15 因时（inspire）13 关节手控制。
+"""17 因时（inspire）13 关节手控制。
 
 mock:  内存桩为 6 电机模型（mock 工厂不区分厂商，set_positions 截前 6；
        force/speed 通道是空操作——对应检查显式跳过，不报假通过）。
 real:  需先启动 inspire_hand 驱动（can0/can1）；angle/force/speed 三路指令
        + angle_actual 反馈 + SetClearError 清错服务。本厂商无手势预设
-       （brainco 的 6 电机预设表到 13 关节无映射），手势测试见 14。
+       （brainco 的 6 电机预设表到 13 关节无映射），手势测试见 16。
 sim:   工厂拒绝 inspire（两指手模型），退出码 2。
 
 用法:
-    python3 examples/15_hand_inspire_demo.py                                # 默认半握 500
-    python3 examples/15_hand_inspire_demo.py --pos 500 --force 300 --speed 500
-    python3 examples/15_hand_inspire_demo.py --backend real --side left
-    python3 examples/15_hand_inspire_demo.py --backend real --clear-error
+    python3 examples/17_hand_inspire_demo.py                                # 默认半握 500
+    python3 examples/17_hand_inspire_demo.py --pos 500 --force 300 --speed 500
+    python3 examples/17_hand_inspire_demo.py --backend real --side left
+    python3 examples/17_hand_inspire_demo.py --backend real --clear-error
 """
 
 import sys
@@ -28,7 +28,7 @@ JOINT_COUNT = 13                          # 因时 13 关节（0=伸直 .. 1000=
 
 class InspireHandDemo(DemoBase):
 
-    def __init__(self, backend='mock', side='right'):
+    def __init__(self, backend='real', side='right'):
         super().__init__(backend, enable={'hand'}, hand_vendor='inspire')
         self.side = side
         self._args: dict = {}     # main() 注入 CLI 参数（实例级，避免类级共享）
@@ -80,7 +80,7 @@ class InspireHandDemo(DemoBase):
 def main(argv=None):
     import argparse
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument('--backend', default='mock',
+    parser.add_argument('--backend', default='real',
                         choices=['mock', 'real', 'sim'])
     parser.add_argument('--side', default='right', choices=['left', 'right'])
     parser.add_argument('--pos', type=int,

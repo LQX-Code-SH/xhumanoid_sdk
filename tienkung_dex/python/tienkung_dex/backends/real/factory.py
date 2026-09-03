@@ -99,8 +99,14 @@ class RealBackendFactory:
     def build(self) -> dict:
         subsystems = {}
 
-        # Core: robot state + joint groups (missing vendor msgs = fatal).
-        if self._wanted('joint'):
+        # Robot state cache: joint groups and the xsens IMU source both feed
+        # off the one /robot_state subscription, so the cache must exist
+        # whenever either is enabled (missing vendor msgs = fatal).
+        need_state_cache = (self._wanted('joint')
+                            or (self._wanted('imu')
+                                and self._imu_source == 'xsens'))
+        state_cache = None
+        if need_state_cache:
             state_cache = RobotStateCache(
                 self._node, self._robot_state_topic, logger=self._log)
             if not state_cache.start():
@@ -110,14 +116,17 @@ class RealBackendFactory:
                     'host at /opt/humanoid/install)')
             subsystems['state_cache'] = state_cache
 
+        if self._wanted('joint'):
+            if state_cache is None:   # defensive: wanted('joint') => cache
+                raise RuntimeError(
+                    'real backend: joint groups require the /robot_state '
+                    'state cache')
             for group in t.JOINT_GROUPS:
                 joint = RealJointGroup(
                     self._node, group, state_cache, self._joints_table,
                     self._log, cmd_topic=self._cmd_topics.get(group),
                     stale_timeout=self._state_timeout)
                 subsystems[f'joint_{group}'] = joint
-        else:
-            state_cache = None
 
         # Safety: degraded (interception off) when the message is unknown.
         safety = RealSafetyMonitor(

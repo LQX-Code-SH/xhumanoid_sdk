@@ -323,7 +323,7 @@ class AudioSystemBase(SubsystemBase):
         Same blocking constraint as speak(blocking=True)."""
         raise NotImplementedError
 
-    def stop_playback(self) -> bool:
+    def stop_playback(self, timeout: float = 5.0) -> bool:
         """TTS cmd='stop'."""
         raise NotImplementedError
 
