@@ -3,9 +3,10 @@
 """SimBackendFactory (design doc §6).
 
 Camera / IMU / lidar topics are identical to the real machine (main-project
-06 §4.3), so the real subscription classes are reused verbatim; only the
-joint path and the non-physical services (audio, safety, hands) are
-replaced. Vendor message packages are never imported by this backend.
+06 §4.3), so the real subscription classes are reused verbatim; the joint
+path, the 6-DOF hand bridge and the non-physical services (audio, safety)
+are replaced. Vendor message packages are never imported by this backend
+(everything rides on sensor_msgs/JointState).
 """
 
 from __future__ import annotations
@@ -39,9 +40,9 @@ class SimBackendFactory:
         self._params = params
 
         if hand_vendor != 'brainco':
-            # Design decision (doc §6): the sim only models the brainco
-            # 6-motor -> two-finger equivalent; an inspire mapping is not
-            # invented until the real interface is verified (§11.2).
+            # Design decision (doc §6): the sim models the brainco 6-DOF
+            # hand only (gz/URDF hand bridge); an inspire 13-joint mapping
+            # is not invented until the real interface is verified (§11.2).
             raise BackendUnavailableError(
                 f'sim backend supports hand_vendor="brainco" only, '
                 f'got {hand_vendor!r}')
@@ -96,9 +97,17 @@ class SimBackendFactory:
                 logger=self._log)
 
         if self._wanted('hand'):
+            cmd_topics = self._params.get(
+                'sim_hand_cmd_topic', t.SIM_HAND_CMD_TOPIC)
+            state_topics = self._params.get(
+                'sim_hand_state_topic', t.SIM_HAND_STATE_TOPIC)
             for side in ('left', 'right'):
                 subsystems[f'hand_{side}'] = SimDexterousHand(
-                    self._node, side, logger=self._log)
+                    self._node, side,
+                    cmd_topic=cmd_topics[side],
+                    state_topic=state_topics[side],
+                    logger=self._log,
+                    stale_timeout=self._state_timeout)
 
         if self._wanted('audio'):
             subsystems['audio'] = MockAudioSystem(self._node, logger=self._log)

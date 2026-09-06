@@ -7,7 +7,7 @@ mock:  内存桩为 6 电机模型（mock 工厂不区分厂商，set_positions 
 real:  需先启动 inspire_hand 驱动（can0/can1）；angle/force/speed 三路指令
        + angle_actual 反馈 + SetClearError 清错服务。本厂商无手势预设
        （brainco 的 6 电机预设表到 13 关节无映射），手势测试见 16。
-sim:   工厂拒绝 inspire（两指手模型），退出码 2。
+sim:   工厂拒绝 inspire（仿真仅 6-DOF 手模型），退出码 2。
 
 用法:
     python3 examples/17_hand_inspire_demo.py                                # 默认半握 500

@@ -395,7 +395,7 @@ class MockAudioSystem(AudioSystemBase):
 
 
 class MockDexterousHand(DexterousHandBase):
-    """Headless hand: mirrors the sim two-finger model."""
+    """Headless hand: mirrors the sim 6-DOF hand, in-memory (no ROS graph)."""
 
     def __init__(self, node, side: str, logger=None):
         super().__init__(node, side, vendor='brainco-mock')

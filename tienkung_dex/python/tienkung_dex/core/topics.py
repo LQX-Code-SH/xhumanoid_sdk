@@ -120,6 +120,17 @@ INSPIRE_HAND_TOPICS = {
 SIM_JOINT_STATE_TOPIC = '/joint_states'        # sensor_msgs/JointState (gz)
 SIM_JOINT_CMD_TOPIC = '/tienkung_dex/joint_cmds'
 SIM_IMU_TOPIC = '/imu'                         # gz standard imu topic
+# Sim 6-DOF hand bridge (simulation pkg hand_bridge): per-hand 6-code
+# sensor_msgs/JointState. Cmd drives the gz 12-joint hand trajectory
+# (proximal + distal followers); state echoes gz position back as codes.
+SIM_HAND_CMD_TOPIC = {
+    'left': '/tienkung_dex/left_hand/joint_cmds',
+    'right': '/tienkung_dex/right_hand/joint_cmds',
+}
+SIM_HAND_STATE_TOPIC = {
+    'left': '/tienkung_dex/left_hand/state',
+    'right': '/tienkung_dex/right_hand/state',
+}
 
 # --- vector walking (HRIC cmd_vel, robot host) ------------------------------
 # Reference: 具身天工DEX-矢量行走接口.md (飞书文档, 提取于 2026-09-03).

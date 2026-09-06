@@ -18,7 +18,7 @@ tienkung_dex/
 │   │       ├── real/                 # 真机：SDK 话题适配（唯一 import *_msgs 的层；
 │   │       │                         #   joint/audio/camera/safety/sensors/walk/
 │   │       │                         #   hand(brainco+inspire)/power/light/sbus/serial）
-│   │       ├── sim/                  # 仿真：ros_gz 桥接同名话题 + 两指手模型
+│   │       ├── sim/                  # 仿真：ros_gz 桥接同名话题 + 6-DOF 手（hand_bridge）
 │   │       └── mock.py               # 内存桩：无 ROS 图，单测/故障注入
 │   ├── examples/                     # 22 个手动测试 demo（继承 TienkungDex，
 │   │                                 #   real 默认；22 号仅 mock，详见 examples/README.md）
@@ -114,7 +114,7 @@ python3 examples/03_robot_state.py --backend mock     # headless 桩（无真机
 ## 已知限制（与设计文档 §11 开放问题一一对应）
 
 1. **head/waist/leg 消息类与 `/robot_state` 对应字段**仅有 arm 有 demo 佐证：`HeadCtrl/WaistCtrl/LegCtrl` 缺失时回退 `ArmCtrl`（字段集一致，HWI §7.1），启动日志会告警；
-2. **因时 13 维手**接口已在真机确认（`angle/force/speed_set` 话题、13 维 `joint_values`、`angle_actual/force_actual/touch_data` 反馈、`SetClearError` 清错服务），real 后端支持 `hand_vendor='inspire'`；`sim` 后端仍不支持（工厂抛 `BackendUnavailableError`，保持两指手模型），`mock` 为内存桩（与手厂商无关）；
+2. **因时 13 维手**接口已在真机确认（`angle/force/speed_set` 话题、13 维 `joint_values`、`angle_actual/force_actual/touch_data` 反馈、`SetClearError` 清错服务），real 后端支持 `hand_vendor='inspire'`；`sim` 后端仍不支持（工厂抛 `BackendUnavailableError`，仿真只建模 brainco 6-DOF 手，无 13 关节映射），`mock` 为内存桩（与手厂商无关）；
 3. **六维力**（HWI 待验证）：话题名需显式传 `force_topic=`；无数据时 `is_active=False`、`latest()=None`，不抛异常；
 4. **`RobotState.imu` 单位**：demo 双版本按"度"透传姿态角，库不做换算，`ImuReading` 字段标"待验证"；
 5. **全景 6 目相机**（选配）：默认不启用（`enable` 不含 `panorama`），且非 Bi-View 感知源（仅能力封装）；压缩话题需 cv2 才能解码，推荐 raw；
