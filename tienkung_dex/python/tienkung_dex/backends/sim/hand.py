@@ -68,6 +68,12 @@ class SimDexterousHand(DexterousHandBase):
         return (self._last_seen is not None
                 and time.monotonic() - self._last_seen < self._stale_timeout)
 
+    def status_age(self) -> Optional[float]:
+        """Seconds since the latest state frame (None = never seen)."""
+        if self._last_seen is None:
+            return None
+        return time.monotonic() - self._last_seen
+
     def _on_state(self, msg) -> None:
         vals = list(msg.position)
         positions = tuple(int(round(v)) for v in vals[:MOTOR_COUNT])
@@ -103,10 +109,14 @@ class SimDexterousHand(DexterousHandBase):
                 f'{self.name}: {timeout:.0f}s 内未发现匹配订阅者'
                 '（hand_bridge 未运行？），仍尝试发送')
 
-    def _publish(self, positions: Sequence[int]) -> None:
+    def _publish(self, positions: Sequence[int], *,
+                 wait_match: bool = True) -> None:
+        """wait_match=False skips the discovery wait (non-blocking path for
+        the hand controller closed loop, same rationale as real backend)."""
         if self._pub is None:
             raise RuntimeError(f'{self.name} not started')
-        self._wait_pub_matched()
+        if wait_match:
+            self._wait_pub_matched()
         from sensor_msgs.msg import JointState
         msg = JointState()
         msg.header.stamp = self._node.get_clock().now().to_msg()
@@ -115,11 +125,16 @@ class SimDexterousHand(DexterousHandBase):
         msg.position = [float(p) for p in positions]
         self._pub.publish(msg)
 
-    def set_positions(self, positions: Sequence[int]) -> None:
+    def publish_positions(self, positions: Sequence[int], *,
+                          wait_match: bool = True) -> None:
+        """Send 6 clipped codes over the hand-bridge JointState cmd topic."""
         clipped = tuple(max(POS_MIN, min(POS_MAX, int(p)))
                         for p in positions[:MOTOR_COUNT])
         clipped = clipped + (POS_MIN,) * (MOTOR_COUNT - len(clipped))
-        self._publish(clipped)
+        self._publish(clipped, wait_match=wait_match)
+
+    def set_positions(self, positions: Sequence[int]) -> None:
+        self.publish_positions(positions, wait_match=True)
 
     def set_gesture(self, gesture: str) -> bool:
         preset = GESTURE_POSITIONS.get(gesture)

@@ -93,6 +93,7 @@ class RealDexterousHand(DexterousHandBase):
         self._status_cls = None
         self._touch_cls = None
         self._status = None
+        self._last_status_at: Optional[float] = None
         self._touch_cbs: list[Callable[[TouchReading], None]] = []
 
     def on_start(self) -> None:
@@ -127,15 +128,27 @@ class RealDexterousHand(DexterousHandBase):
         self._sub = None
         self._touch_sub = None
         self._status = None
+        self._last_status_at = None
 
     @property
     def is_active(self) -> bool:
         return self._status is not None
 
+    def status_age(self) -> Optional[float]:
+        """Seconds since the latest MotorStatus frame (None = never seen).
+
+        Liveness gate for the hand controller watchdog: real hand driver
+        publishes ~30Hz; a stale/cold status means "do not drive".
+        """
+        if self._last_status_at is None:
+            return None
+        return time.monotonic() - self._last_status_at
+
     def _on_status(self, msg) -> None:
         positions = tuple(int(getattr(msg, 'positions', ())[i]) if i < len(
             getattr(msg, 'positions', ())) else 0 for i in range(MOTOR_COUNT))
         self._status = HandStatus(positions=positions, raw=msg)
+        self._last_status_at = time.monotonic()
 
     def _on_touch(self, msg) -> None:
         items = []
@@ -152,10 +165,16 @@ class RealDexterousHand(DexterousHandBase):
             cb(reading)
 
     # -- control ----------------------------------------------------------
-    def _publish(self, positions, speeds=None, currents=None) -> None:
+    def _publish(self, positions, speeds=None, currents=None, *,
+                 wait_match: bool = True) -> None:
+        """wait_match=False skips the discovery wait (fast path for the
+        hand controller's closed loop: it gates on fresh motor_status before
+        sending, and re-sends until feedback converges, so an unmatched
+        early frame self-heals instead of blocking the control tick)."""
         if self._pub is None:
             raise RuntimeError(f'{self.name} not started')
-        _wait_pub_matched(self._node, self._log, self.name, self._pub)
+        if wait_match:
+            _wait_pub_matched(self._node, self._log, self.name, self._pub)
         msg = self._msg_cls()
         msg.mode = self._control_mode
         positions = tuple(positions)[:MOTOR_COUNT]
@@ -169,9 +188,16 @@ class RealDexterousHand(DexterousHandBase):
             msg.durations[i] = 0
         self._pub.publish(msg)
 
+    def publish_positions(self, positions: Sequence[int], *,
+                          wait_match: bool = True) -> None:
+        """Send 6 clipped codes (brainco scale); wait_match=False is the
+        non-blocking closed-loop path (see _publish)."""
+        clipped = tuple(max(POS_MIN, min(POS_MAX, int(p)))
+                        for p in positions[:MOTOR_COUNT])
+        self._publish(clipped, wait_match=wait_match)
+
     def set_positions(self, positions: Sequence[int]) -> None:
-        clipped = tuple(max(POS_MIN, min(POS_MAX, int(p))) for p in positions)
-        self._publish(clipped)
+        self.publish_positions(positions, wait_match=True)
 
     # -- sequenced control --------------------------------------------------
     def _spin_once(self, timeout_sec: float = 0.05) -> None:

@@ -268,6 +268,30 @@ class DexterousHandBase(SubsystemBase):
     def get_status(self) -> Optional[HandStatus]:
         """Cached latest motor status."""
 
+    def status_age(self) -> Optional[float]:
+        """Seconds since the latest feedback frame (None = never seen).
+
+        Upper-layer liveness gates (hand controller watchdog) rely on this;
+        real/sim backends track the receive time of motor_status / state.
+        """
+        return None
+
+    def error_to(self, target: Sequence[int]) -> Optional[float]:
+        """Max per-motor |feedback - target| (None when no feedback yet).
+
+        Shared helper for upper-layer closed-loop settle / stall detection.
+        """
+        st = self.get_status()
+        if st is None:
+            return None
+        fb = getattr(st, 'positions', None)
+        if not fb:
+            return None
+        n = min(len(fb), len(target))
+        if n <= 0:
+            return None
+        return float(max(abs(int(fb[i]) - int(target[i])) for i in range(n)))
+
     def on_touch(self, cb: Callable[[TouchReading], None]) -> None:
         """Observer for optional touch hardware (silent when absent)."""
 
